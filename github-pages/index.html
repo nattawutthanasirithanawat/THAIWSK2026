@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>THAI WSK 2026 | สืบศิลป์ถิ่นอักษร สืบสุนทรภาษาไทย</title>
+  <meta name="description" content="ระบบเข้าร่วมโครงการส่งเสริมและพัฒนาความรู้ความสามารถด้านภาษาไทย โรงเรียนกระทุ่มแบน วิเศษสมุทคุณ">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+  <!-- Sticky Header -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <div class="brand-wrap" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+        <div class="brand-logo">ก-ฮ</div>
+        <div>
+          <div class="brand-title">THAI WSK 2026</div>
+          <div class="brand-sub">สืบศิลป์ถิ่นอักษร สืบสุนทรภาษาไทย</div>
+        </div>
+      </div>
+      <nav class="nav-menu">
+        <a href="#hero" class="nav-link active">หน้าแรก</a>
+        <a href="#exam-sec" class="nav-link">เข้าทำแบบทดสอบ</a>
+        <a href="#scores-sec" class="nav-link">ตรวจสอบคะแนน</a>
+        <a href="#cert-sec" class="nav-link">ดาวน์โหลดเกียรติบัตร</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section id="hero" class="hero-section">
+    <div class="container">
+      <div class="hero-tag">
+        กลุ่มสาระการเรียนรู้ภาษาไทย โรงเรียนกระทุ่มแบน "วิเศษสมุทคุณ"
+      </div>
+      <h1 class="hero-title">
+        สืบศิลป์ถิ่นอักษร สืบสุนทรภาษาไทย
+      </h1>
+      <p class="hero-slogan">
+        โครงการส่งเสริมและพัฒนาความรู้ความสามารถด้านภาษาไทย ประจำปีการศึกษา 2569
+      </p>
+
+      <div id="countdown-wrapper" class="countdown-grid">
+        <div class="countdown-box">
+          <div id="cd-days" class="countdown-num">00</div>
+          <div class="countdown-lbl">วัน</div>
+        </div>
+        <div class="countdown-box">
+          <div id="cd-hours" class="countdown-num">00</div>
+          <div class="countdown-lbl">ชั่วโมง</div>
+        </div>
+        <div class="countdown-box">
+          <div id="cd-mins" class="countdown-num">00</div>
+          <div class="countdown-lbl">นาที</div>
+        </div>
+        <div class="countdown-box">
+          <div id="cd-secs" class="countdown-num">00</div>
+          <div class="countdown-lbl">วินาที</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Cards -->
+  <main class="container">
+    <div class="cards-grid">
+      
+      <div class="action-card">
+        <div>
+          <h3 style="color:var(--primary); font-size:18px; margin-bottom:8px;">1. เข้าทำแบบทดสอบ</h3>
+          <p style="font-size:14px; color:#666;">
+            แบบทดสอบวัดความรู้ภาษาไทย ระดับชั้น ม.ต้น (ม.1–3) และ ม.ปลาย (ม.4–6)
+          </p>
+        </div>
+        <a href="#exam-sec" class="btn-cta">เลือกระดับชั้นเพื่อสอบ</a>
+      </div>
+
+      <div class="action-card">
+        <div>
+          <h3 style="color:var(--primary-light); font-size:18px; margin-bottom:8px;">2. ตรวจสอบคะแนน</h3>
+          <p style="font-size:14px; color:#666;">
+            ค้นหาคะแนนสอบ คะแนนร้อยละ และระดับเหรียญรางวัลด้วยชื่อ-นามสกุล
+          </p>
+        </div>
+        <a href="#scores-sec" class="btn-cta" style="background:var(--primary-light);">ตรวจสอบคะแนน</a>
+      </div>
+
+      <div class="action-card">
+        <div>
+          <h3 style="color:#B38F3B; font-size:18px; margin-bottom:8px;">3. ดาวน์โหลดเกียรติบัตร</h3>
+          <p style="font-size:14px; color:#666;">
+            ดาวน์โหลดเกียรติบัตรอิเล็กทรอนิกส์ PDF สำหรับผู้ผ่านเกณฑ์ 60% ขึ้นไป
+          </p>
+        </div>
+        <a href="#cert-sec" class="btn-cta" style="background:var(--gold); color:var(--primary);">ค้นหาเกียรติบัตร</a>
+      </div>
+
+    </div>
+
+    <!-- Exam Section -->
+    <section id="exam-sec" class="content-section" style="border-top:1px solid #E5E7EB;">
+      <div class="section-head">
+        <h2 class="section-title">ระบบทำแบบทดสอบออนไลน์</h2>
+        <p style="font-size:14px; color:#666;">เลือกทำแบบทดสอบตามระดับชั้นของท่าน</p>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:24px; max-width:850px; margin:0 auto;">
+        <div style="background:#fff; border:1px solid #E5E7EB; border-radius:14px; padding:24px;">
+          <span style="font-size:12px; font-weight:600; color:var(--primary); background:#FAF8FD; padding:4px 10px; border-radius:999px;">ม.ต้น (ม.1–3)</span>
+          <h3 style="margin-top:10px; font-size:18px; color:var(--text-dark);">ข้อสอบวัดความรู้ภาษาไทย ระดับ ม.ต้น</h3>
+          <p style="font-size:13px; color:#666; margin:8px 0 16px;">ครอบคลุมหลักภาษา การสะกดคำ และวรรณคดีระดับ ม.ต้น (20 ข้อ)</p>
+          <a href="https://docs.google.com/forms" target="_blank" class="btn-cta">เข้าสู่แบบทดสอบ (ม.ต้น)</a>
+        </div>
+
+        <div style="background:#fff; border:1px solid #E5E7EB; border-radius:14px; padding:24px;">
+          <span style="font-size:12px; font-weight:600; color:var(--primary-light); background:#FAF8FD; padding:4px 10px; border-radius:999px;">ม.ปลาย (ม.4–6)</span>
+          <h3 style="margin-top:10px; font-size:18px; color:var(--text-dark);">ข้อสอบวัดความรู้ภาษาไทย ระดับ ม.ปลาย</h3>
+          <p style="font-size:13px; color:#666; margin:8px 0 16px;">ครอบคลุมหลักภาษาเชิงวิชาการ วรรณคดีวิจักษ์ และฉันทลักษณ์ (20 ข้อ)</p>
+          <a href="https://docs.google.com/forms" target="_blank" class="btn-cta" style="background:var(--primary-light);">เข้าสู่แบบทดสอบ (ม.ปลาย)</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Score Check Section -->
+    <section id="scores-sec" class="content-section" style="border-top:1px solid #E5E7EB;">
+      <div class="section-head">
+        <h2 class="section-title">ตรวจสอบผลคะแนนการทดสอบ</h2>
+        <p style="font-size:14px; color:#666;">กรอกชื่อหรือชื่อ-นามสกุลเพื่อดูผลการทดสอบ</p>
+      </div>
+
+      <div class="search-card">
+        <div class="input-group">
+          <label class="input-label">ชื่อ หรือ ชื่อ-นามสกุล ผู้เข้าสอบ:</label>
+          <input type="text" id="score-input" class="input-text" placeholder="เช่น กิตติพงษ์ รักอักษร">
+        </div>
+        <button onclick="searchScore()" class="btn-cta">ตรวจสอบผลคะแนน</button>
+        <div id="score-result"></div>
+      </div>
+    </section>
+
+    <!-- Certificate Section -->
+    <section id="cert-sec" class="content-section" style="border-top:1px solid #E5E7EB;">
+      <div class="section-head">
+        <h2 class="section-title">ดาวน์โหลดเกียรติบัตรอิเล็กทรอนิกส์</h2>
+        <p style="font-size:14px; color:#666;">เกียรติบัตรพร้อมให้ดาวน์โหลดสำหรับผู้ผ่านเกณฑ์ 60% ขึ้นไป</p>
+      </div>
+
+      <div class="search-card">
+        <div class="input-group">
+          <label class="input-label">ชื่อ หรือ ชื่อ-นามสกุล ผู้เข้าสอบ:</label>
+          <input type="text" id="cert-input" class="input-text" placeholder="เช่น กิตติพงษ์ รักอักษร">
+        </div>
+        <button onclick="searchCertificate()" class="btn-cta" style="background:var(--gold); color:var(--primary);">ค้นหาเกียรติบัตร</button>
+        <div id="cert-result"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:20px; padding-bottom:30px; border-bottom:1px solid rgba(255,255,255,0.1);">
+        <div>
+          <strong style="font-size:15px;">กลุ่มสาระการเรียนรู้ภาษาไทย โรงเรียนกระทุ่มแบน "วิเศษสมุทคุณ"</strong><br>
+          442/30 ต.ตลาดกระทุ่มแบน อ.กระทุ่มแบน จ.สมุทรสาคร 74110<br>
+          โทรศัพท์: 034-471902 · โทรสาร: 034-471901 · อีเมล: wisetschool@gmail.com
+        </div>
+        <div>
+          <strong>จัดทำระบบโดย:</strong> นายณัฐวุฒิ ธนาศิริธนวัชร์<br>
+          นักศึกษาฝึกประสบการณ์วิชาชีพครู ชั้นปีที่ 2 สาขาวิชาภาษาไทย คณะศึกษาศาสตร์ มหาวิทยาลัยศิลปากร<br>
+          ติดต่อผู้ดูแลระบบ Facebook: Nattawut BK
+        </div>
+      </div>
+      <div style="text-align:center; padding-top:20px; color:var(--gold-light);">
+        © 2026 กลุ่มสาระการเรียนรู้ภาษาไทย โรงเรียนกระทุ่มแบน "วิเศษสมุทคุณ" · THAI WSK 2026
+      </div>
+    </div>
+  </footer>
+
+  <script src="./js/app.js"></script>
+</body>
+</html>

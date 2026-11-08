@@ -1,41 +1,56 @@
-# แนวทางการเผยแพร่เว็บไซต์ (Deployment Guide)
+# คู่มือการนำระบบ THAI WSK 2026 ขึ้น GitHub และ Deploy สด
 
-โครงการ **THAI WSK 2026** รองรับการเผยแพร่เว็บไซต์ 2 รูปแบบ:
-
----
-
-## รูปแบบที่ 1 (แนะนำ): MODE A — Google Apps Script Web App
-*วิธีนี้ง่าย รวดเร็ว และไม่ต้องตั้งค่าเซิร์ฟเวอร์ภายนอกเพิ่มเติม*
-
-1. นำไฟล์ทั้งหมดในโฟลเดอร์ `apps-script/` ไปวางในโปรเจกต์ Google Apps Script:
-   - `Code.gs`
-   - `Setup.gs`
-   - `Index.html`
-   - `Styles.html`
-   - `Client.html`
-   - `appsscript.json` (ตั้งค่าใน Project Settings > Show "appsscript.json" manifest file in editor)
-2. รันฟังก์ชัน `setupSystem()` จาก `Setup.gs` ครั้งแรก
-3. คลิกปุ่ม **Deploy (ทำให้ใช้งานได้)** > **New deployment (การทำให้ใช้งานได้ใหม่)**
-4. เลือกประเภท: **Web app**
-   - Execute as: **Me**
-   - Who has access: **Anyone**
-5. คัดลอก Web App URL เพื่อเผยแพร่ให้นักเรียนใช้งานได้ทันที
+โปรเจกต์นี้จัดเตรียมไฟล์สำหรับนำขึ้น GitHub และเปิดออนไลน์ผ่าน GitHub Pages ไว้อย่างสมบูรณ์แบบ 2 วิธี:
 
 ---
 
-## รูปแบบที่ 2: MODE B — GitHub Pages + Cloudflare Worker Proxy
-*ใช้เมื่อต้องการให้เว็บไซต์เปิดบนโดเมนของโรงเรียน เช่น `thai-wsk-2026.github.io` หรือโดเมนโรงเรียนโดยตรง*
+## วิธีที่ 1 (แนะนำที่สุด): Deploy อัตโนมัติด้วย GitHub Actions
+*ระบบมีไฟล์ `.github/workflows/deploy.yml` จัดเตรียมไว้แล้ว เพียงแค่นำโค้ดขึ้น GitHub ระบบจะ Build และ Deploy เว็บไซต์ให้ทันที!*
 
-### ขั้นตอนการตั้งค่า:
-1. **GitHub Pages (Frontend):**
-   - สร้าง repository บน GitHub ชื่อ `thai-wsk-2026`
-   - นำไฟล์ Frontend และ Build Artifacts ขึ้น branch `main` หรือ `gh-pages`
-   - เปิดฟีเจอร์ GitHub Pages ใน Settings > Pages
+### ขั้นตอน:
+1. **สร้าง Repository บน GitHub:**
+   - เข้า [github.com](https://github.com) > คลิก **New repository**
+   - ตั้งชื่อ Repository: `thai-wsk-2026`
+   - เลือกเป็น **Public**
+   - กด **Create repository**
 
-2. **Cloudflare Worker API Bridge (Proxy):**
-   - สมัครบัญชี Cloudflare (ใช้งานฟรี)
-   - ไปที่เมนู Workers & Pages > Create application > Create Worker
-   - นำโค้ดจาก `proxy/worker.js` ไปวางใน Worker Editor
-   - กำหนดค่า Environment Variable `APPS_SCRIPT_URL` ให้ชี้ไปยัง Google Apps Script Web App URL ที่ได้จากข้อ 1
-   - นำ Worker URL ที่ได้ไปกำหนดในค่า `VITE_API_ENDPOINT` หรือตั้งค่าในแอปพลิเคชัน
-   - ระบบจะจัดการ CORS และรักษาความปลอดภัยของคำขอระหว่าง GitHub Pages กับ Google Apps Script ได้อย่างสมบูรณ์
+2. **Push โค้ดทั้งหมดขึ้น GitHub:**
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit for THAI WSK 2026"
+   git branch -M main
+   git remote add origin https://github.com/<YOUR-USERNAME>/thai-wsk-2026.git
+   git push -u origin main
+   ```
+
+3. **เปิดการใช้งาน GitHub Pages ใน Repository:**
+   - ไปที่แท็บ **Settings** ของ Repository บน GitHub
+   - เมนูด้านซ้ายเลือก **Pages**
+   - ในหัวข้อ **Build and deployment > Source** ให้เปลี่ยนเป็น:
+     👉 **GitHub Actions**
+   - รอ 1–2 นาที GitHub Actions จะรันตามไฟล์ `.github/workflows/deploy.yml`
+   - เมื่อรันสำเร็จ จะปรากฏ URL เว็บไซต์จริง เช่น:  
+     `https://<YOUR-USERNAME>.github.io/thai-wsk-2026/`
+
+---
+
+## วิธีที่ 2: ใช้โฟลเดอร์ Static `github-pages/` (ไม่ต้องใช้ Node.js)
+*หากต้องการอัปโหลดไฟล์ HTML/CSS/JS สำเร็จรูปโดยไม่ต้องรันคำสั่ง Build:*
+
+1. นำไฟล์ในโฟลเดอร์ `github-pages/` ประกอบด้วย:
+   - `index.html`
+   - โฟลเดอร์ `css/` (ไฟล์ `style.css`)
+   - โฟลเดอร์ `js/` (ไฟล์ `app.js`)
+2. วางไว้ที่ราก (Root) ของ Repository หรือ branch `gh-pages`
+3. ใน GitHub Settings > Pages > Source เลือก **Deploy from a branch** แล้วเลือก branch `main` (หรือ `gh-pages`) > `/ (root)`
+4. กด **Save** เว็บไซต์จะเปิดใช้งานได้ทันที
+
+---
+
+## การเชื่อมต่อ Google Sheets ฐานข้อมูลจริง
+1. นำไฟล์จากโฟลเดอร์ `apps-script/` ไปติดตั้งใน Google Sheets ID:  
+   `10uaEo5pVJ3hDGeLixOnPsDT60WQtqVmSPXPS4FJnuN8`
+2. รันฟังก์ชัน `setupSystem()` จาก `apps-script/Setup.gs`
+3. กด Deploy เป็น Web App
+4. นำ Web App URL มาใส่ในระบบหรือ Proxy
