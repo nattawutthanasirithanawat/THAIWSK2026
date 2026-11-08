@@ -53,6 +53,35 @@ export default function App() {
     }
 
     loadData();
+
+    // Real-time synchronization across devices (polling every 8 seconds)
+    const syncInterval = setInterval(() => {
+      ApiService.fetchServerData().then((data) => {
+        setConfig(data.config);
+        setAnnouncements(data.announcements);
+        setSchedule(data.schedule);
+        if (data.config.REGISTRATION_DEADLINE) {
+          const deadline = new Date(data.config.REGISTRATION_DEADLINE).getTime();
+          const now = new Date().getTime();
+          setIsExpired(now > deadline || !data.config.REGISTRATION_OPEN);
+        }
+      }).catch(() => {});
+    }, 8000);
+
+    // Sync immediately when browser window regains focus
+    const handleFocus = () => {
+      ApiService.fetchServerData().then((data) => {
+        setConfig(data.config);
+        setAnnouncements(data.announcements);
+        setSchedule(data.schedule);
+      }).catch(() => {});
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const handleSaveAll = (

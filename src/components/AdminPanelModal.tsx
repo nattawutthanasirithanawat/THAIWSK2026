@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
-  X, Lock, ShieldCheck, Save, Plus, Trash2, Edit3, CheckCircle,
-  FileText, Calendar, Megaphone, Award, BookOpen, Sliders, LogOut, Info
+  X, Lock, ShieldCheck, Save, Plus, Trash2, CheckCircle,
+  FileText, Calendar, Megaphone, Award, BookOpen, Sliders, LogOut, Info, Image, School
 } from 'lucide-react';
 import { PublicConfig, Announcement, ScheduleItem, ProjectObjective, AwardCriteriaItem } from '../types';
 import { ApiService } from '../services/api';
@@ -31,7 +31,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   // Active admin tab
   const [activeTab, setActiveTab] = useState<
-    'general' | 'about' | 'criteria' | 'exams' | 'search' | 'schedule' | 'announcements'
+    'general' | 'images' | 'about' | 'criteria' | 'exams' | 'search' | 'schedule' | 'announcements' | 'footer'
   >('general');
 
   // Form states cloned for editing
@@ -39,6 +39,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [formAnnouncements, setFormAnnouncements] = useState<Announcement[]>(announcements);
   const [formSchedule, setFormSchedule] = useState<ScheduleItem[]>(schedule);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Sync state whenever opened
   React.useEffect(() => {
@@ -70,13 +71,63 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   };
 
   const handleSave = async () => {
-    await ApiService.saveConfig(formConfig);
-    await ApiService.saveAnnouncements(formAnnouncements);
-    await ApiService.saveSchedule(formSchedule);
+    setIsSaving(true);
+    try {
+      // Saves to server-side JSON and localStorage so ALL devices see the exact same data immediately
+      await ApiService.saveAllSystemData(formConfig, formAnnouncements, formSchedule);
+      onSaveAll(formConfig, formAnnouncements, formSchedule);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3500);
+    } catch (err) {
+      console.error('Save error:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    onSaveAll(formConfig, formAnnouncements, formSchedule);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  // --- Image Slide Handlers ---
+  const handleAddHeroImage = (url: string = '') => {
+    const list = formConfig.HERO_BANNER_IMAGES || [];
+    setFormConfig({
+      ...formConfig,
+      HERO_BANNER_IMAGES: [...list, url || ''],
+    });
+  };
+
+  const handleRemoveHeroImage = (index: number) => {
+    const list = formConfig.HERO_BANNER_IMAGES || [];
+    setFormConfig({
+      ...formConfig,
+      HERO_BANNER_IMAGES: list.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleUpdateHeroImage = (index: number, val: string) => {
+    const list = [...(formConfig.HERO_BANNER_IMAGES || [])];
+    list[index] = val;
+    setFormConfig({ ...formConfig, HERO_BANNER_IMAGES: list });
+  };
+
+  const handleAddAboutImage = (url: string = '') => {
+    const list = formConfig.ABOUT_IMAGES || [];
+    setFormConfig({
+      ...formConfig,
+      ABOUT_IMAGES: [...list, url || ''],
+    });
+  };
+
+  const handleRemoveAboutImage = (index: number) => {
+    const list = formConfig.ABOUT_IMAGES || [];
+    setFormConfig({
+      ...formConfig,
+      ABOUT_IMAGES: list.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleUpdateAboutImage = (index: number, val: string) => {
+    const list = [...(formConfig.ABOUT_IMAGES || [])];
+    list[index] = val;
+    setFormConfig({ ...formConfig, ABOUT_IMAGES: list });
   };
 
   // --- Objective Handlers ---
@@ -220,7 +271,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 ระบบจัดการสำหรับผู้ดูแลระบบ (Admin Control Center)
               </h2>
               <div className="text-xs text-[#F5E8C7]">
-                THAI WSK 2026 · กลุ่มสาระการเรียนรู้ภาษาไทย โรงเรียนกระทุ่มแบน "วิเศษสมุทคุณ"
+                THAI WSK 2026 · ข้อมูลอัปเดตแบบเรียลไทม์เชื่อมโยงทุกอุปกรณ์
               </div>
             </div>
           </div>
@@ -246,7 +297,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
           </div>
         </div>
 
-        {/* Not Logged In Screen */}
+        {/* Not Logged In Screen (NO credentials shown) */}
         {!isAuthenticated ? (
           <div className="p-8 sm:p-12 overflow-y-auto flex-1 flex flex-col items-center justify-center max-w-md mx-auto w-full">
             <div className="w-16 h-16 rounded-full bg-[#FAF8FD] border-2 border-[#D6AF55] flex items-center justify-center text-[#4B267D] mb-6 shadow-sm">
@@ -310,12 +361,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             <div className="flex border-b border-stone-200 bg-stone-50 px-4 overflow-x-auto gap-1 shrink-0">
               {[
                 { id: 'general', label: '1. ข้อมูลทั่วไป', icon: <Sliders className="w-3.5 h-3.5" /> },
-                { id: 'about', label: '2. เกี่ยวกับโครงการ', icon: <BookOpen className="w-3.5 h-3.5" /> },
-                { id: 'criteria', label: '3. เกณฑ์รางวัล', icon: <Award className="w-3.5 h-3.5" /> },
-                { id: 'exams', label: '4. แบบทดสอบ', icon: <FileText className="w-3.5 h-3.5" /> },
-                { id: 'search', label: '5. คะแนน & เกียรติบัตร', icon: <Info className="w-3.5 h-3.5" /> },
-                { id: 'schedule', label: '6. กำหนดการ', icon: <Calendar className="w-3.5 h-3.5" /> },
-                { id: 'announcements', label: '7. ประกาศข่าว', icon: <Megaphone className="w-3.5 h-3.5" /> },
+                { id: 'images', label: '2. ภาพสไลด์ (10 วิ)', icon: <Image className="w-3.5 h-3.5" /> },
+                { id: 'about', label: '3. เกี่ยวกับโครงการ', icon: <BookOpen className="w-3.5 h-3.5" /> },
+                { id: 'criteria', label: '4. เกณฑ์รางวัล', icon: <Award className="w-3.5 h-3.5" /> },
+                { id: 'exams', label: '5. แบบทดสอบ', icon: <FileText className="w-3.5 h-3.5" /> },
+                { id: 'search', label: '6. คะแนน & เกียรติบัตร', icon: <Info className="w-3.5 h-3.5" /> },
+                { id: 'schedule', label: '7. กำหนดการ', icon: <Calendar className="w-3.5 h-3.5" /> },
+                { id: 'announcements', label: '8. ประกาศข่าว', icon: <Megaphone className="w-3.5 h-3.5" /> },
+                { id: 'footer', label: '9. ข้อมูลกลุ่มสาระ & ผู้พัฒนา', icon: <School className="w-3.5 h-3.5" /> },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -395,7 +448,155 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 2: About Section & Objectives */}
+              {/* TAB 2: Images & 10-Second Slideshows */}
+              {activeTab === 'images' && (
+                <div className="space-y-6">
+                  <div>
+                    <div className="font-heading font-semibold text-base text-[#4B267D]">
+                      จัดการรูปภาพหัวเว็บ และส่วนเกี่ยวกับโครงการ (ระบบสไลด์ 10 วินาที)
+                    </div>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      สามารถเพิ่มหลายรูปเพื่อให้ระบบเปลี่ยนภาพอัตโนมัติทุก ๆ 10 วินาที หรือจะใส่เพียงรูปเดียวเพื่อแสดงภาพนิ่งก็ได้
+                    </p>
+                  </div>
+
+                  {/* 1. Hero Banner Images */}
+                  <div className="p-4 rounded-xl border border-stone-200 bg-[#FAF8FD] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-heading font-semibold text-xs text-[#4B267D] uppercase tracking-wide">
+                        1. รูปภาพแบนเนอร์ส่วนหัวเว็บ (Hero Banner)
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddHeroImage('')}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#4B267D] text-white text-xs font-medium hover:bg-[#7043A6] transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>เพิ่มรูปภาพหัวเว็บ</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(formConfig.HERO_BANNER_IMAGES || []).map((imgUrl, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-stone-200">
+                          <span className="text-xs font-bold text-stone-400 w-6 text-center">{idx + 1}.</span>
+                          <input
+                            type="text"
+                            value={imgUrl}
+                            onChange={(e) => handleUpdateHeroImage(idx, e.target.value)}
+                            placeholder="URL รูปภาพ เช่น /src/assets/images/... หรือ https://..."
+                            className="flex-1 px-3 py-1.5 border rounded text-xs font-mono"
+                          />
+                          {imgUrl && (
+                            <img
+                              src={imgUrl}
+                              alt="preview"
+                              className="w-10 h-7 object-cover rounded border"
+                              onError={(e) => (e.target as HTMLElement).style.display = 'none'}
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveHeroImage(idx)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded"
+                            title="ลบรูปนี้"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Presets */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-stone-500">
+                      <span>ภาพแนะนำระบบ:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddHeroImage('/src/assets/images/hero_thai_wsk_1794124482494.jpg')}
+                        className="px-2.5 py-1 rounded bg-stone-200 hover:bg-stone-300 text-stone-700 cursor-pointer"
+                      >
+                        + แบนเนอร์อักษรไทยสีทอง
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddHeroImage('/src/assets/images/thai_literature_art_1794124482930.jpg')}
+                        className="px-2.5 py-1 rounded bg-stone-200 hover:bg-stone-300 text-stone-700 cursor-pointer"
+                      >
+                        + สมุดข่อยและวรรณคดี
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2. About Section Images */}
+                  <div className="p-4 rounded-xl border border-stone-200 bg-[#FAF8FD] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="font-heading font-semibold text-xs text-[#7043A6] uppercase tracking-wide">
+                        2. รูปภาพในส่วน "เกี่ยวกับโครงการวิชาการ"
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleAddAboutImage('')}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#7043A6] text-white text-xs font-medium hover:bg-[#4B267D] transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>เพิ่มรูปภาพส่วนโครงการ</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {(formConfig.ABOUT_IMAGES || []).map((imgUrl, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-stone-200">
+                          <span className="text-xs font-bold text-stone-400 w-6 text-center">{idx + 1}.</span>
+                          <input
+                            type="text"
+                            value={imgUrl}
+                            onChange={(e) => handleUpdateAboutImage(idx, e.target.value)}
+                            placeholder="URL รูปภาพ เช่น /src/assets/images/... หรือ https://..."
+                            className="flex-1 px-3 py-1.5 border rounded text-xs font-mono"
+                          />
+                          {imgUrl && (
+                            <img
+                              src={imgUrl}
+                              alt="preview"
+                              className="w-10 h-7 object-cover rounded border"
+                              onError={(e) => (e.target as HTMLElement).style.display = 'none'}
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAboutImage(idx)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded"
+                            title="ลบรูปนี้"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Presets */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-stone-500">
+                      <span>ภาพแนะนำระบบ:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleAddAboutImage('/src/assets/images/thai_literature_art_1794124482930.jpg')}
+                        className="px-2.5 py-1 rounded bg-stone-200 hover:bg-stone-300 text-stone-700 cursor-pointer"
+                      >
+                        + วรรณคดีไทยและสมุดข่อย
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddAboutImage('/src/assets/images/certificate_preview_1794124484424.jpg')}
+                        className="px-2.5 py-1 rounded bg-stone-200 hover:bg-stone-300 text-stone-700 cursor-pointer"
+                      >
+                        + กรอบเกียรติบัตรทองคำ
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: About Section & Objectives */}
               {activeTab === 'about' && (
                 <div className="space-y-4">
                   <div className="font-heading font-semibold text-base text-[#4B267D] mb-1">
@@ -439,7 +640,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     </div>
 
                     <div className="space-y-3">
-                      {formConfig.ABOUT_OBJECTIVES.map((obj, index) => (
+                      {formConfig.ABOUT_OBJECTIVES.map((obj) => (
                         <div key={obj.id} className="p-4 rounded-xl border border-stone-200 bg-[#FAF8FD] space-y-2 relative">
                           <div className="flex items-center justify-between gap-2">
                             <input
@@ -472,7 +673,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 3: Award Criteria */}
+              {/* TAB 4: Award Criteria */}
               {activeTab === 'criteria' && (
                 <div className="space-y-4">
                   <div className="font-heading font-semibold text-base text-[#4B267D] mb-1">
@@ -580,7 +781,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 4: Exams & Instructions */}
+              {/* TAB 5: Exams & Instructions */}
               {activeTab === 'exams' && (
                 <div className="space-y-5">
                   <div className="font-heading font-semibold text-base text-[#4B267D] mb-1">
@@ -747,7 +948,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 5: Score Search & Certificates */}
+              {/* TAB 6: Score Search & Certificates */}
               {activeTab === 'search' && (
                 <div className="space-y-4">
                   <div className="font-heading font-semibold text-base text-[#4B267D] mb-1">
@@ -836,7 +1037,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 6: Schedule Management */}
+              {/* TAB 7: Schedule Management */}
               {activeTab === 'schedule' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -937,7 +1138,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               )}
 
-              {/* TAB 7: Announcements Management */}
+              {/* TAB 8: Announcements Management */}
               {activeTab === 'announcements' && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -1024,6 +1225,160 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 </div>
               )}
 
+              {/* TAB 9: Footer & Developer Information */}
+              {activeTab === 'footer' && (
+                <div className="space-y-5">
+                  <div>
+                    <div className="font-heading font-semibold text-base text-[#4B267D]">
+                      จัดการข้อมูลกลุ่มสาระและผู้พัฒนาระบบ (ส่วนท้ายเว็บไซต์ / Footer)
+                    </div>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      สามารถแก้ไขชื่อหน่วยงาน ที่อยู่ เบอร์โทรสาร ข้อมูลผู้พัฒนา และลิขสิทธิ์ระบบ
+                    </p>
+                  </div>
+
+                  {/* School / Department Information */}
+                  <div className="p-4 rounded-xl border border-stone-200 bg-[#FAF8FD] space-y-4">
+                    <div className="font-heading font-semibold text-xs text-[#4B267D] uppercase tracking-wide">
+                      ข้อมูลหน่วยงาน / กลุ่มสาระการเรียนรู้
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">ชื่อหน่วยงาน / โรงเรียน</label>
+                        <input
+                          type="text"
+                          value={formConfig.SCHOOL_NAME}
+                          onChange={(e) => setFormConfig({ ...formConfig, SCHOOL_NAME: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">คำอธิบายย่อใน Footer</label>
+                        <input
+                          type="text"
+                          value={formConfig.SCHOOL_DESCRIPTION}
+                          onChange={(e) => setFormConfig({ ...formConfig, SCHOOL_DESCRIPTION: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">ที่อยู่โรงเรียน</label>
+                      <input
+                        type="text"
+                        value={formConfig.SCHOOL_ADDRESS}
+                        onChange={(e) => setFormConfig({ ...formConfig, SCHOOL_ADDRESS: e.target.value })}
+                        className="w-full bg-white px-3 py-2 border rounded-lg text-xs"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">เบอร์โทรศัพท์</label>
+                        <input
+                          type="text"
+                          value={formConfig.SCHOOL_PHONE}
+                          onChange={(e) => setFormConfig({ ...formConfig, SCHOOL_PHONE: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">โทรสาร</label>
+                        <input
+                          type="text"
+                          value={formConfig.SCHOOL_FAX}
+                          onChange={(e) => setFormConfig({ ...formConfig, SCHOOL_FAX: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">อีเมลโรงเรียน</label>
+                        <input
+                          type="email"
+                          value={formConfig.SCHOOL_EMAIL}
+                          onChange={(e) => setFormConfig({ ...formConfig, SCHOOL_EMAIL: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">เว็บไซต์ทางการ</label>
+                        <input
+                          type="url"
+                          value={formConfig.SCHOOL_WEBSITE}
+                          onChange={(e) => setFormConfig({ ...formConfig, SCHOOL_WEBSITE: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">ลิงก์ Facebook โรงเรียน</label>
+                        <input
+                          type="url"
+                          value={formConfig.SCHOOL_FACEBOOK}
+                          onChange={(e) => setFormConfig({ ...formConfig, SCHOOL_FACEBOOK: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Developer Information */}
+                  <div className="p-4 rounded-xl border border-stone-200 bg-[#FAF8FD] space-y-4">
+                    <div className="font-heading font-semibold text-xs text-[#7043A6] uppercase tracking-wide">
+                      ข้อมูลผู้พัฒนาระบบ
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">ชื่อผู้พัฒนาระบบ</label>
+                        <input
+                          type="text"
+                          value={formConfig.DEVELOPER_NAME}
+                          onChange={(e) => setFormConfig({ ...formConfig, DEVELOPER_NAME: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 mb-1">ลิงก์ Facebook / ช่องทางติดต่อผู้พัฒนา</label>
+                        <input
+                          type="url"
+                          value={formConfig.DEVELOPER_FACEBOOK}
+                          onChange={(e) => setFormConfig({ ...formConfig, DEVELOPER_FACEBOOK: e.target.value })}
+                          className="w-full bg-white px-3 py-2 border rounded-lg text-xs font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">รายละเอียดตำแหน่ง / สถาบันการศึกษา</label>
+                      <textarea
+                        rows={2}
+                        value={formConfig.DEVELOPER_DETAILS}
+                        onChange={(e) => setFormConfig({ ...formConfig, DEVELOPER_DETAILS: e.target.value })}
+                        className="w-full bg-white px-3 py-2 border rounded-lg text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Copyright Bar */}
+                  <div className="p-4 rounded-xl border border-stone-200 bg-white space-y-2">
+                    <label className="block text-xs font-semibold text-stone-700">
+                      ข้อความลิขสิทธิ์ด้านล่างสุด (Copyright Bar)
+                    </label>
+                    <input
+                      type="text"
+                      value={formConfig.FOOTER_COPYRIGHT}
+                      onChange={(e) => setFormConfig({ ...formConfig, FOOTER_COPYRIGHT: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg text-xs font-medium"
+                    />
+                  </div>
+                </div>
+              )}
+
             </div>
 
             {/* Bottom Actions Bar */}
@@ -1032,7 +1387,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 {saveSuccess && (
                   <span className="text-xs text-emerald-600 flex items-center gap-1 font-semibold animate-fade-in">
                     <CheckCircle className="w-4 h-4" />
-                    <span>บันทึกการเปลี่ยนแปลงทั้งหมดลงในระบบเรียบร้อยแล้ว</span>
+                    <span>บันทึกและฝังข้อมูลลงในระบบแล้ว ข้อมูลจะเหมือนกันทุกอุปกรณ์แบบเรียลไทม์</span>
                   </span>
                 )}
               </div>
@@ -1048,10 +1403,20 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSave}
+                  disabled={isSaving}
                   className="px-5 py-2.5 rounded-xl bg-[#4B267D] hover:bg-[#7043A6] text-white text-xs font-heading font-semibold flex items-center gap-2 shadow-md shadow-[#4B267D]/20 transition-all cursor-pointer"
                 >
-                  <Save className="w-4 h-4" />
-                  <span>บันทึกการแก้ไขทั้งหมด</span>
+                  {isSaving ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>กำลังบันทึกและฝังข้อมูล...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>บันทึกและฝังข้อมูลลงในระบบ</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

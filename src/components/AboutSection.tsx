@@ -1,5 +1,5 @@
-import React from 'react';
-import { Bookmark, Target } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bookmark, Target, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PublicConfig } from '../types';
 
 interface AboutSectionProps {
@@ -8,6 +8,34 @@ interface AboutSectionProps {
 
 export const AboutSection: React.FC<AboutSectionProps> = ({ config }) => {
   const objectives = config.ABOUT_OBJECTIVES || [];
+
+  // Extract images for About Section slideshow
+  const images: string[] = (config.ABOUT_IMAGES && config.ABOUT_IMAGES.length > 0)
+    ? config.ABOUT_IMAGES
+    : ['/src/assets/images/thai_literature_art_1794124482930.jpg'];
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Auto-slide every 10 seconds if multiple images exist
+  useEffect(() => {
+    if (images.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % images.length);
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [images.length]);
+
+  const handlePrevSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentSlide((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  const handleNextSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentSlide((prev) => (prev + 1) % images.length);
+  };
 
   return (
     <section className="py-16 sm:py-20 bg-[#FAF8FD]">
@@ -30,19 +58,65 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ config }) => {
         {/* 2-Column Academic Composition */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mb-16">
           
-          {/* Left Visual: Authentic Thai Literature Artwork */}
-          <div className="lg:col-span-5 rounded-2xl overflow-hidden border border-stone-200/90 shadow-md relative group">
-            <div className="aspect-4/3 w-full bg-stone-100 overflow-hidden">
-              <img
-                src="/src/assets/images/thai_literature_art_1794124482930.jpg"
-                alt="วรรณคดีไทยและสมุดข่อยโบราณ โครงการสืบศิลป์ถิ่นอักษร"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
-              />
+          {/* Left Visual: Authentic Thai Literature Artwork with 10-second Slideshow */}
+          <div className="lg:col-span-5 rounded-2xl overflow-hidden border border-stone-200/90 shadow-md relative group bg-stone-100">
+            <div className="aspect-4/3 w-full overflow-hidden relative">
+              {images.map((imgSrc, idx) => (
+                <img
+                  key={idx}
+                  src={imgSrc}
+                  alt={`ภาพประกอบโครงการที่ ${idx + 1}`}
+                  referrerPolicy="no-referrer"
+                  className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+                    idx === currentSlide ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
+                  }`}
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ))}
+
+              {/* Prev / Next Buttons if multiple images */}
+              {images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handlePrevSlide}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-xs transition-colors z-20 cursor-pointer"
+                    aria-label="ภาพก่อนหน้า"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextSlide}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-xs transition-colors z-20 cursor-pointer"
+                    aria-label="ภาพถัดไป"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+
+                  {/* Dot Indicators */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+                    {images.map((_, dotIdx) => (
+                      <button
+                        key={dotIdx}
+                        type="button"
+                        onClick={() => setCurrentSlide(dotIdx)}
+                        className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                          dotIdx === currentSlide ? 'w-5 bg-[#D6AF55]' : 'w-1.5 bg-white/60 hover:bg-white'
+                        }`}
+                        aria-label={`ไปที่ภาพที่ ${dotIdx + 1}`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
+
             <div className="p-4 bg-white border-t border-stone-100">
               <div className="text-xs text-stone-500 italic">
-                ภาพประกอบ: วรรณคดีไทยและสมุดข่อย ศิลปะแห่งลายอักษรไทยอันทรงคุณค่า
+                ภาพประกอบ: กิจกรรมและการส่งเสริมความเป็นเลิศทางภาษาและวรรณคดีไทย
               </div>
             </div>
           </div>

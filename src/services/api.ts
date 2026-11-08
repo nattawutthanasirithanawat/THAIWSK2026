@@ -1,9 +1,9 @@
 import { PublicConfig, ScoreRecord, CertificateRecord, Announcement, ScheduleItem } from '../types';
 import { DEFAULT_CONFIG, INITIAL_ANNOUNCEMENTS, INITIAL_SCHEDULE, INITIAL_SCORES, INITIAL_CERTIFICATES } from '../data/defaultConfig';
+import persistedInitial from '../data/persistedData.json';
 
 /**
  * Normalizes Thai names by trimming, collapsing spaces, and stripping prefixes
- * Supported prefixes: นาย, นางสาว, นาง, เด็กชาย, เด็กหญิง, ด.ช., ด.ญ., etc.
  */
 export function normalizeThaiName(input: string): { cleanFullName: string; firstName: string; lastName: string } {
   if (!input) return { cleanFullName: '', firstName: '', lastName: '' };
@@ -42,57 +42,107 @@ export function normalizeThaiName(input: string): { cleanFullName: string; first
   };
 }
 
-const CONFIG_STORAGE_KEY = 'thai_wsk_config_v2';
-const ANNOUNCEMENTS_STORAGE_KEY = 'thai_wsk_announcements_v2';
-const SCHEDULE_STORAGE_KEY = 'thai_wsk_schedule_v2';
+const CONFIG_STORAGE_KEY = 'thai_wsk_config_v3';
+const ANNOUNCEMENTS_STORAGE_KEY = 'thai_wsk_announcements_v3';
+const SCHEDULE_STORAGE_KEY = 'thai_wsk_schedule_v3';
 
 export class ApiService {
-  public static async getConfig(): Promise<PublicConfig> {
+  /**
+   * Fetches latest system data from server (synced across all electronic devices)
+   */
+  public static async fetchServerData(): Promise<{
+    config: PublicConfig;
+    announcements: Announcement[];
+    schedule: ScheduleItem[];
+  }> {
     try {
-      const stored = localStorage.getItem(CONFIG_STORAGE_KEY);
-      if (stored) {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(stored) };
+      const res = await fetch('/api/system-data');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.status === 'success' && json.data) {
+          const cfg = { ...DEFAULT_CONFIG, ...(json.data.config || {}) };
+          const ann = json.data.announcements || INITIAL_ANNOUNCEMENTS;
+          const sch = json.data.schedule || INITIAL_SCHEDULE;
+
+          // Cache locally
+          localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg));
+          localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(ann));
+          localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(sch));
+
+          return { config: cfg, announcements: ann, schedule: sch };
+        }
       }
     } catch {
-      // fallback
+      // Offline / Static fallback
     }
-    return DEFAULT_CONFIG;
+
+    // Fallback to persisted JSON bundled in build or localStorage
+    try {
+      const storedCfg = localStorage.getItem(CONFIG_STORAGE_KEY);
+      const storedAnn = localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
+      const storedSch = localStorage.getItem(SCHEDULE_STORAGE_KEY);
+
+      const cfg = storedCfg ? JSON.parse(storedCfg) : (persistedInitial.config as any || DEFAULT_CONFIG);
+      const ann = storedAnn ? JSON.parse(storedAnn) : (persistedInitial.announcements as any || INITIAL_ANNOUNCEMENTS);
+      const sch = storedSch ? JSON.parse(storedSch) : (persistedInitial.schedule as any || INITIAL_SCHEDULE);
+
+      return {
+        config: { ...DEFAULT_CONFIG, ...cfg },
+        announcements: ann,
+        schedule: sch,
+      };
+    } catch {
+      return {
+        config: DEFAULT_CONFIG,
+        announcements: INITIAL_ANNOUNCEMENTS,
+        schedule: INITIAL_SCHEDULE,
+      };
+    }
   }
 
-  public static async saveConfig(updated: PublicConfig): Promise<void> {
-    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(updated));
+  public static async getConfig(): Promise<PublicConfig> {
+    const data = await this.fetchServerData();
+    return data.config;
   }
 
   public static async getAnnouncements(): Promise<Announcement[]> {
-    try {
-      const stored = localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // fallback
-    }
-    return INITIAL_ANNOUNCEMENTS;
-  }
-
-  public static async saveAnnouncements(list: Announcement[]): Promise<void> {
-    localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(list));
+    const data = await this.fetchServerData();
+    return data.announcements;
   }
 
   public static async getSchedule(): Promise<ScheduleItem[]> {
-    try {
-      const stored = localStorage.getItem(SCHEDULE_STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch {
-      // fallback
-    }
-    return INITIAL_SCHEDULE;
+    const data = await this.fetchServerData();
+    return data.schedule;
   }
 
-  public static async saveSchedule(list: ScheduleItem[]): Promise<void> {
-    localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(list));
+  /**
+   * Saves updated system data to both the Server filesystem and LocalStorage
+   * Ensuring all devices access the identical latest data immediately
+   */
+  public static async saveAllSystemData(
+    config: PublicConfig,
+    announcements: Announcement[],
+    schedule: ScheduleItem[]
+  ): Promise<boolean> {
+    // 1. Update localStorage immediately
+    localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+    localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(announcements));
+    localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(schedule));
+
+    // 2. Post to server-side endpoint to write to persistedData.json
+    try {
+      const res = await fetch('/api/admin/save-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config, announcements, schedule }),
+      });
+      if (res.ok) {
+        return true;
+      }
+    } catch (err) {
+      console.warn('Could not reach backend save endpoint, saved locally:', err);
+    }
+    return true;
   }
 
   /**

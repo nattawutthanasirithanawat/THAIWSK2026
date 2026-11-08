@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowRight, BookOpen, Sparkles, School } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, BookOpen, Sparkles, School, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CountdownTimer } from './CountdownTimer';
 import { PublicConfig, TabType } from '../types';
 
@@ -11,6 +11,34 @@ interface HeroProps {
 }
 
 export const Hero: React.FC<HeroProps> = ({ config, onSelectTab, isExpired, onStatusChange }) => {
+  // Extract images for banner
+  const images: string[] = (config.HERO_BANNER_IMAGES && config.HERO_BANNER_IMAGES.length > 0)
+    ? config.HERO_BANNER_IMAGES
+    : (config.HERO_BANNER_URL ? [config.HERO_BANNER_URL] : ['/src/assets/images/hero_thai_wsk_1794124482494.jpg']);
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  // Auto-slide every 10 seconds if multiple images exist
+  useEffect(() => {
+    if (images.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % images.length);
+    }, 10000); // 10 seconds
+
+    return () => clearInterval(interval);
+  }, [images.length]);
+
+  const handlePrevSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentSlide((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  const handleNextSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentSlide((prev) => (prev + 1) % images.length);
+  };
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-[#4B267D] via-[#3B1D63] to-[#2B1549] text-white pt-10 pb-24 sm:pt-16 sm:pb-32">
       {/* Decorative Thai Pattern Overlay */}
@@ -24,7 +52,7 @@ export const Hero: React.FC<HeroProps> = ({ config, onSelectTab, isExpired, onSt
         <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-[#D6AF55]/30 text-xs sm:text-sm text-[#F5E8C7] backdrop-blur-md">
             <School className="w-4 h-4 text-[#D6AF55]" />
-            <span>กลุ่มสาระการเรียนรู้ภาษาไทย โรงเรียนกระทุ่มแบน "วิเศษสมุทคุณ"</span>
+            <span>{config.SCHOOL_NAME || 'กลุ่มสาระการเรียนรู้ภาษาไทย โรงเรียนกระทุ่มแบน "วิเศษสมุทคุณ"'}</span>
           </div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#D6AF55]/20 border border-[#D6AF55]/40 text-xs text-[#F5E8C7]">
             <Sparkles className="w-3.5 h-3.5 text-[#D6AF55]" />
@@ -36,10 +64,10 @@ export const Hero: React.FC<HeroProps> = ({ config, onSelectTab, isExpired, onSt
         <div className="text-center max-w-4xl mx-auto mb-8">
           <h1 className="font-heading font-extrabold text-3xl sm:text-5xl lg:text-6xl tracking-tight leading-tight mb-4 drop-shadow-md">
             <span className="text-[#F5E8C7] block text-xl sm:text-2xl font-medium tracking-wider mb-2">
-              โครงการส่งเสริมและพัฒนาความรู้ความสามารถด้านภาษาไทย
+              {config.PROJECT_NAME || 'โครงการส่งเสริมและพัฒนาความรู้ความสามารถด้านภาษาไทย'}
             </span>
             <span className="bg-gradient-to-r from-white via-[#F5E8C7] to-[#D6AF55] bg-clip-text text-transparent">
-              สืบศิลป์ถิ่นอักษร สืบสุนทรภาษาไทย
+              {config.PROJECT_SUBTITLE || 'สืบศิลป์ถิ่นอักษร สืบสุนทรภาษาไทย'}
             </span>
           </h1>
 
@@ -48,20 +76,63 @@ export const Hero: React.FC<HeroProps> = ({ config, onSelectTab, isExpired, onSt
           </p>
         </div>
 
-        {/* Hero Visual Artwork Banner */}
-        <div className="max-w-4xl mx-auto mb-10 rounded-2xl overflow-hidden border border-[#D6AF55]/30 shadow-2xl relative group">
-          <div className="aspect-16/9 w-full bg-[#3B1D63] overflow-hidden relative">
-            <img
-              src="/src/assets/images/hero_thai_wsk_1794124482494.jpg"
-              alt="โครงการสืบศิลป์ถิ่นอักษร สืบสุนทรภาษาไทย THAI WSK 2026"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover transform group-hover:scale-102 transition-transform duration-700"
-              onError={(e) => {
-                // styled fallback container if image fails
-                (e.target as HTMLElement).style.display = 'none';
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#2B1549]/90 via-transparent to-transparent flex items-end p-6">
+        {/* Hero Visual Artwork Banner (with 10-second slideshow support) */}
+        <div className="max-w-4xl mx-auto mb-10 rounded-2xl overflow-hidden border border-[#D6AF55]/30 shadow-2xl relative group bg-[#3B1D63]">
+          <div className="aspect-16/9 w-full overflow-hidden relative">
+            {images.map((imgSrc, idx) => (
+              <img
+                key={idx}
+                src={imgSrc}
+                alt={`ภาพแบนเนอร์โครงการที่ ${idx + 1}`}
+                referrerPolicy="no-referrer"
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+                  idx === currentSlide ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
+                }`}
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            ))}
+
+            {/* Next / Prev Controls (Visible if multiple images) */}
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handlePrevSlide}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-xs transition-colors z-20 cursor-pointer"
+                  aria-label="ภาพก่อนหน้า"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextSlide}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-xs transition-colors z-20 cursor-pointer"
+                  aria-label="ภาพถัดไป"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+
+                {/* Dot Indicators */}
+                <div className="absolute bottom-16 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-20">
+                  {images.map((_, dotIdx) => (
+                    <button
+                      key={dotIdx}
+                      type="button"
+                      onClick={() => setCurrentSlide(dotIdx)}
+                      className={`h-2 rounded-full transition-all cursor-pointer ${
+                        dotIdx === currentSlide ? 'w-6 bg-[#D6AF55]' : 'w-2 bg-white/50 hover:bg-white'
+                      }`}
+                      aria-label={`ไปที่ภาพที่ ${dotIdx + 1}`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Gradient Scrim */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#2B1549]/90 via-transparent to-transparent flex items-end p-6 z-10 pointer-events-none">
               <div className="text-left">
                 <div className="text-xs uppercase tracking-wider text-[#D6AF55] font-semibold mb-1">
                   กิจกรรมวิชาการระดับมัธยมศึกษา

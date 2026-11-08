@@ -23,11 +23,13 @@ export interface PublicConfig {
   PROJECT_SLOGAN: string;
   LOGO_URL: string;
   HERO_BANNER_URL: string;
+  HERO_BANNER_IMAGES: string[];
   ANNOUNCEMENT_TEXT: string;
   
   // Section Headings & Explanations
   ABOUT_SECTION_TITLE: string;
   ABOUT_SECTION_SUBTITLE: string;
+  ABOUT_IMAGES: string[];
   ABOUT_OBJECTIVES: ProjectObjective[];
 
   // Criteria Section
@@ -68,6 +70,7 @@ export interface PublicConfig {
   
   // School Info
   SCHOOL_NAME: string;
+  SCHOOL_DESCRIPTION: string;
   SCHOOL_ADDRESS: string;
   SCHOOL_PHONE: string;
   SCHOOL_FAX: string;
@@ -79,6 +82,9 @@ export interface PublicConfig {
   DEVELOPER_NAME: string;
   DEVELOPER_DETAILS: string;
   DEVELOPER_FACEBOOK: string;
+  
+  // Footer Copyright
+  FOOTER_COPYRIGHT: string;
 }
 
 export interface Participant {

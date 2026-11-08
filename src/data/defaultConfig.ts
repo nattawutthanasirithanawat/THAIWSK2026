@@ -74,11 +74,19 @@ export const DEFAULT_CONFIG: PublicConfig = {
   PROJECT_SLOGAN: 'ภาษาไทยล้ำค่า สืบสานภูมิปัญญา เชิดชูคุณค่าศิลป์แห่งสุนทร',
   LOGO_URL: '',
   HERO_BANNER_URL: '',
+  HERO_BANNER_IMAGES: [
+    '/src/assets/images/hero_thai_wsk_1794124482494.jpg',
+    '/src/assets/images/thai_literature_art_1794124482930.jpg'
+  ],
   ANNOUNCEMENT_TEXT: 'ขอเชิญนักเรียนชั้น ม.1 - ม.6 ร่วมกิจกรรมวัดความรู้ความสามารถภาษาไทย ประจำปีการศึกษา 2569 พร้อมรับเกียรติบัตรอิเล็กทรอนิกส์',
 
   // About Section
   ABOUT_SECTION_TITLE: 'สืบศิลป์ถิ่นอักษร สืบสุนทรภาษาไทย',
   ABOUT_SECTION_SUBTITLE: 'เกี่ยวกับโครงการวิชาการ',
+  ABOUT_IMAGES: [
+    '/src/assets/images/thai_literature_art_1794124482930.jpg',
+    '/src/assets/images/certificate_preview_1794124484424.jpg'
+  ],
   ABOUT_OBJECTIVES: INITIAL_OBJECTIVES,
 
   // Criteria Section
@@ -119,6 +127,7 @@ export const DEFAULT_CONFIG: PublicConfig = {
   
   // School Info
   SCHOOL_NAME: 'กลุ่มสาระการเรียนรู้ภาษาไทย โรงเรียนกระทุ่มแบน "วิเศษสมุทคุณ"',
+  SCHOOL_DESCRIPTION: 'โครงการส่งเสริมและพัฒนาความรู้ความสามารถด้านภาษาไทย (THAI WSK 2026) มุ่งเน้นการยกระดับผลสัมฤทธิ์ทางการเรียนและการอนุรักษ์มรดกทางวัฒนธรรมภาษาไทย',
   SCHOOL_ADDRESS: '442/30 ต.ตลาดกระทุ่มแบน อ.กระทุ่มแบน จ.สมุทรสาคร 74110',
   SCHOOL_PHONE: '034-471902',
   SCHOOL_FAX: '034-471901',
@@ -130,6 +139,9 @@ export const DEFAULT_CONFIG: PublicConfig = {
   DEVELOPER_NAME: 'นายณัฐวุฒิ ธนาศิริธนวัชร์',
   DEVELOPER_DETAILS: 'นักศึกษาฝึกประสบการณ์วิชาชีพครู ชั้นปีที่ 2 สาขาวิชาภาษาไทย คณะศึกษาศาสตร์ มหาวิทยาลัยศิลปากร',
   DEVELOPER_FACEBOOK: 'https://www.facebook.com/nattawut.bk',
+
+  // Footer Copyright
+  FOOTER_COPYRIGHT: '© 2026 กลุ่มสาระการเรียนรู้ภาษาไทย โรงเรียนกระทุ่มแบน "วิเศษสมุทคุณ". สงวนลิขสิทธิ์.',
 };
 
 export const INITIAL_ANNOUNCEMENTS: Announcement[] = [
