@@ -1,0 +1,94 @@
+<script>
+  let currentConfig = {};
+
+  window.addEventListener('DOMContentLoaded', () => {
+    loadInitialConfig();
+  });
+
+  function loadInitialConfig() {
+    google.script.run
+      .withSuccessHandler((config) => {
+        currentConfig = config;
+        updateUIWithConfig(config);
+      })
+      .withFailureHandler((err) => {
+        console.error('Failed to load config:', err);
+      })
+      .getPublicConfig();
+  }
+
+  function updateUIWithConfig(config) {
+    if (config.PROJECT_NAME) {
+      document.querySelectorAll('.site-title').forEach(el => el.innerText = config.PROJECT_NAME);
+    }
+  }
+
+  function searchStudentScore() {
+    const name = document.getElementById('scoreNameInput').value;
+    const code = document.getElementById('scoreCodeInput').value;
+    const resultBox = document.getElementById('scoreResultContainer');
+
+    resultBox.innerHTML = '<div style="text-align:center; padding: 20px;">กำลังค้นหาข้อมูล...</div>';
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (res.status === 'FOUND' && res.record) {
+          const r = res.record;
+          resultBox.innerHTML = \`
+            <div style="background:#fff; border: 2px solid #D6AF55; border-radius: 12px; padding: 20px; margin-top: 15px;">
+              <h3 style="color:#4B267D; font-size: 18px; margin-bottom: 8px;">\${r.Prefix} \${r.First_Name} \${r.Last_Name}</h3>
+              <p style="font-size: 14px; color:#555;">ระดับชั้น: \${r.Level} | รหัสผู้สอบ: \${r.Participant_ID}</p>
+              <div style="display:flex; justify-content:space-between; margin-top: 15px; background:#FAF8FD; padding: 12px; border-radius: 8px;">
+                <div>คะแนนที่ได้: <strong>\${r.Score} / \${r.Full_Score}</strong></div>
+                <div>คิดเป็นร้อยละ: <strong>\${r.Percentage}%</strong></div>
+                <div>ระดับรางวัล: <strong style="color:#B38F3B;">\${r.Award_Level}</strong></div>
+              </div>
+            </div>
+          \`;
+        } else {
+          resultBox.innerHTML = \`
+            <div style="background:#FFF3CD; color:#856404; padding: 15px; border-radius: 8px; margin-top: 15px;">
+              \${res.message || 'ไม่พบข้อมูล'}
+            </div>
+          \`;
+        }
+      })
+      .withFailureHandler((err) => {
+        resultBox.innerHTML = '<div style="color:red; padding:15px;">เกิดข้อผิดพลาดในการเชื่อมต่อ</div>';
+      })
+      .searchScore(name, code);
+  }
+
+  function searchStudentCertificate() {
+    const name = document.getElementById('certNameInput').value;
+    const code = document.getElementById('certCodeInput').value;
+    const resultBox = document.getElementById('certResultContainer');
+
+    resultBox.innerHTML = '<div style="text-align:center; padding: 20px;">กำลังค้นหาเกียรติบัตร...</div>';
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (res.status === 'FOUND' && res.record) {
+          const r = res.record;
+          resultBox.innerHTML = \`
+            <div style="background:#fff; border: 2px solid #D6AF55; border-radius: 12px; padding: 20px; margin-top: 15px;">
+              <h3 style="color:#4B267D; font-size: 18px; margin-bottom: 8px;">\${r.Prefix} \${r.First_Name} \${r.Last_Name}</h3>
+              <p style="font-size: 14px; color:#555;">ระดับรางวัล: \${r.Award_Level}</p>
+              <p style="font-size: 13px; color:#28a745; margin-top: 8px;">สถานะ: \${r.Status}</p>
+              \${r.PDF_URL ? \`<a href="\${r.PDF_URL}" target="_blank" class="btn-primary" style="display:inline-block; text-align:center; text-decoration:none; margin-top:12px;">เปิดดู / ดาวน์โหลด PDF</a>\` : ''}
+            </div>
+          \`;
+        } else {
+          resultBox.innerHTML = \`
+            <div style="background:#FFF3CD; color:#856404; padding: 15px; border-radius: 8px; margin-top: 15px;">
+              \${res.message || 'ไม่พบเกียรติบัตร'}
+            </div>
+          \`;
+        }
+      })
+      .withFailureHandler((err) => {
+        resultBox.innerHTML = '<div style="color:red; padding:15px;">เกิดข้อผิดพลาดในการค้นหา</div>';
+      })
+      .searchCertificate(name, code);
+  }
+</script>

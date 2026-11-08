@@ -1,0 +1,7 @@
+name = "thai-wsk-proxy"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
+ALLOWED_ORIGIN = "https://your-school-org.github.io"
