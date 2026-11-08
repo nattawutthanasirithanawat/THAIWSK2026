@@ -1,15 +1,45 @@
 import { PublicConfig, ScoreRecord, CertificateRecord, Announcement, ScheduleItem } from '../types';
 import { DEFAULT_CONFIG, INITIAL_ANNOUNCEMENTS, INITIAL_SCHEDULE, INITIAL_SCORES, INITIAL_CERTIFICATES } from '../data/defaultConfig';
 import persistedInitial from '../data/persistedData.json';
-import { normalizeThaiName } from './utils'; // ย้ายฟังก์ชัน normalizeThaiName ไปไว้ไฟล์อื่นเพื่อความสะอาด
+
+/**
+ * Normalizes Thai names by trimming, collapsing spaces, and stripping prefixes
+ */
+export function normalizeThaiName(input: string): { cleanFullName: string; firstName: string; lastName: string } {
+  if (!input) return { cleanFullName: '', firstName: '', lastName: '' };
+  
+  let cleaned = input.trim().replace(/\s+/g, ' ');
+  
+  const prefixes = [
+    'เด็กหญิง', 'เด็กชาย', 'นางสาว', 'ด.ช.', 'ด.ญ.', 'ดช.', 'ดญ.', 'ด.ช', 'ด.ญ', 'นาย', 'นาง',
+  ];
+  
+  for (const prefix of prefixes) {
+    if (cleaned.startsWith(prefix)) {
+      cleaned = cleaned.substring(prefix.length).trim();
+      break;
+    }
+  }
+  
+  const parts = cleaned.split(' ');
+  const firstName = parts[0] || '';
+  const lastName = parts.slice(1).join(' ') || '';
+  
+  return {
+    cleanFullName: cleaned,
+    firstName,
+    lastName,
+  };
+}
 
 // 1. นำ URL ของ Google Apps Script Web App (หรือ Cloud Run) มาใส่ที่นี่
+// ถ้ายังไม่มี ให้ใส่ URL เปล่าๆ หรือของเดิมไปก่อนครับ
 const API_URL = 'https://script.google.com/macros/s/AKfycbwp49zX8VL4NIHV2muvKax_0CYT2tiBpRWXuSw7KKnhWMhwn-SsM2RgvEO8DQwZVoP4/exec'; 
 
 export class ApiService {
   
   /**
-   * ดึงข้อมูลล่าสุดจาก Server (Google Sheets / Database)
+   * ดึงข้อมูลล่าสุดจาก Server
    */
   public static async fetchServerData(): Promise<{
     config: PublicConfig;
@@ -17,7 +47,6 @@ export class ApiService {
     schedule: ScheduleItem[];
   }> {
     try {
-      // ดึงจาก API โดยตรง พร้อมป้องกันการจำ Cache
       const res = await fetch(`${API_URL}?_t=${Date.now()}`, {
         method: 'GET',
         cache: 'no-store', 
@@ -34,10 +63,10 @@ export class ApiService {
         }
       }
     } catch (err) {
-      console.error('[Sync] Failed to fetch latest data from server:', err);
+      console.warn('[Sync] Failed to fetch latest data, using offline fallback:', err);
     }
 
-    // Fallback: ถ้าเน็ตหลุดหรือ API พัง ให้ใช้ข้อมูล Default ในโค้ด
+    // Fallback: กรณี API พัง หรือยังไม่ได้ใส่ API_URL ให้แสดงข้อมูลพื้นฐาน
     return {
       config: DEFAULT_CONFIG,
       announcements: INITIAL_ANNOUNCEMENTS,
@@ -70,9 +99,9 @@ export class ApiService {
   ): Promise<{ success: boolean; message: string }> {
     try {
       const res = await fetch(API_URL, {
-        method: 'POST', // ต้องไปเขียน doPost() ใน Google Apps Script ให้รองรับด้วย
+        method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain;charset=utf-8', // Google Apps Script มักจะมีปัญหากับ application/json
         },
         body: JSON.stringify({ config, announcements, schedule }),
       });
@@ -80,7 +109,7 @@ export class ApiService {
       if (res.ok) {
         return {
           success: true,
-          message: 'บันทึกข้อมูลและอัปเดตไปยังระบบเรียบร้อยแล้ว (ผู้ใช้อื่นจะเห็นเมื่อโหลดหน้าเว็บใหม่)',
+          message: 'บันทึกข้อมูลและอัปเดตไปยังระบบเรียบร้อยแล้ว',
         };
       } else {
         const errorText = await res.text();
@@ -98,6 +127,119 @@ export class ApiService {
     }
   }
 
-  // ส่วนค้นหาคะแนนและเกียรติบัตร (searchScore, searchCertificate) ยังคงใช้โค้ดเดิมของคุณได้เลย
-  // ... (โค้ดเดิม) ...
+  /**
+   * Search Score
+   */
+  public static async searchScore(queryName: string): Promise<{
+    status: 'FOUND' | 'NOT_FOUND' | 'MULTIPLE_MATCHES' | 'SYSTEM_CLOSED' | 'INVALID_INPUT';
+    message: string;
+    record?: ScoreRecord;
+    records?: ScoreRecord[];
+  }> {
+    const config = await this.getConfig();
+    if (!config.SCORE_SEARCH_ENABLED) {
+      return {
+        status: 'SYSTEM_CLOSED',
+        message: 'ระบบตรวจสอบผลคะแนนยังไม่เปิดให้ใช้งานในขณะนี้',
+      };
+    }
+
+    const trimmedName = queryName.trim();
+    if (!trimmedName) {
+      return {
+        status: 'INVALID_INPUT',
+        message: 'กรุณากรอกชื่อหรือชื่อ-นามสกุลของผู้เข้าสอบ',
+      };
+    }
+
+    const { firstName, lastName, cleanFullName } = normalizeThaiName(trimmedName);
+
+    const matches = INITIAL_SCORES.filter(item => {
+      const itemNormalized = normalizeThaiName(`${item.First_Name} ${item.Last_Name}`);
+      const firstNameMatch = itemNormalized.firstName === firstName;
+      const lastNameMatch = !lastName || itemNormalized.lastName.includes(lastName) || lastName.includes(itemNormalized.lastName);
+      const fullNameMatch = itemNormalized.cleanFullName.includes(cleanFullName);
+
+      return (firstNameMatch && lastNameMatch) || fullNameMatch;
+    });
+
+    if (matches.length === 0) {
+      return {
+        status: 'NOT_FOUND',
+        message: `ไม่พบข้อมูลผลการสอบของ "${trimmedName}"`,
+      };
+    }
+
+    if (matches.length === 1) {
+      return {
+        status: 'FOUND',
+        message: 'พบข้อมูลผลการทดสอบเรียบร้อยแล้ว',
+        record: matches[0],
+      };
+    }
+
+    return {
+      status: 'MULTIPLE_MATCHES',
+      message: `พบรายชื่อที่ตรงกัน ${matches.length} รายการ`,
+      records: matches,
+    };
+  }
+
+  /**
+   * Search Certificate
+   */
+  public static async searchCertificate(queryName: string): Promise<{
+    status: 'FOUND' | 'NOT_FOUND' | 'MULTIPLE_MATCHES' | 'SYSTEM_CLOSED' | 'INVALID_INPUT';
+    message: string;
+    record?: CertificateRecord;
+    records?: CertificateRecord[];
+  }> {
+    const config = await this.getConfig();
+    if (!config.CERTIFICATE_DOWNLOAD_ENABLED) {
+      return {
+        status: 'SYSTEM_CLOSED',
+        message: 'ระบบดาวน์โหลดเกียรติบัตรยังไม่เปิดให้ใช้งานในขณะนี้',
+      };
+    }
+
+    const trimmedName = queryName.trim();
+    if (!trimmedName) {
+      return {
+        status: 'INVALID_INPUT',
+        message: 'กรุณากรอกชื่อหรือชื่อ-นามสกุลของผู้เข้าสอบ',
+      };
+    }
+
+    const { firstName, lastName, cleanFullName } = normalizeThaiName(trimmedName);
+
+    const matches = INITIAL_CERTIFICATES.filter(item => {
+      const itemNormalized = normalizeThaiName(`${item.First_Name} ${item.Last_Name}`);
+      const firstNameMatch = itemNormalized.firstName === firstName;
+      const lastNameMatch = !lastName || itemNormalized.lastName.includes(lastName) || lastName.includes(itemNormalized.lastName);
+      const fullNameMatch = itemNormalized.cleanFullName.includes(cleanFullName);
+
+      return (firstNameMatch && lastNameMatch) || fullNameMatch;
+    });
+
+    if (matches.length === 0) {
+      return {
+        status: 'NOT_FOUND',
+        message: `ไม่พบข้อมูลเกียรติบัตรของ "${trimmedName}"`,
+      };
+    }
+
+    if (matches.length === 1) {
+      return {
+        status: 'FOUND',
+        message: 'พบข้อมูลเกียรติบัตรเรียบร้อยแล้ว',
+        record: matches[0],
+      };
+    }
+
+    return {
+      status: 'MULTIPLE_MATCHES',
+      message: `พบข้อมูลเกียรติบัตร ${matches.length} รายการ`,
+      records: matches,
+    };
+  }
 }
