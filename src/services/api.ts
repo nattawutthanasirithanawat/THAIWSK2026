@@ -33,10 +33,28 @@ export function normalizeThaiName(input: string): { cleanFullName: string; first
 }
 
 // 1. นำ URL ของ Google Apps Script Web App (หรือ Cloud Run) มาใส่ที่นี่
-// ถ้ายังไม่มี ให้ใส่ URL เปล่าๆ หรือของเดิมไปก่อนครับ
 const API_URL = 'https://script.google.com/macros/s/AKfycbwp49zX8VL4NIHV2muvKax_0CYT2tiBpRWXuSw7KKnhWMhwn-SsM2RgvEO8DQwZVoP4/exec'; 
 
 export class ApiService {
+  
+  /**
+   * เพิ่มฟังก์ชัน onSync กลับเข้ามาเพื่อแก้ปัญหาหน้าเว็บขาว (Uncaught TypeError: onSync is not a function)
+   * และตั้งค่าให้ดึงข้อมูลจาก Server อัตโนมัติทุกๆ 30 วินาที
+   */
+  public static onSync(callback?: () => void): () => void {
+    // กำหนดให้ดึงข้อมูลใหม่ทุกๆ 30 วินาที
+    const interval = setInterval(async () => {
+      try {
+        await this.fetchServerData();
+        if (callback) callback();
+      } catch (error) {
+        console.error("Auto-sync failed:", error);
+      }
+    }, 30000);
+
+    // ส่งคืนฟังก์ชันสำหรับ Cleanup เมื่อ Component ถูกลบ
+    return () => clearInterval(interval);
+  }
   
   /**
    * ดึงข้อมูลล่าสุดจาก Server
@@ -101,7 +119,7 @@ export class ApiService {
       const res = await fetch(API_URL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8', // Google Apps Script มักจะมีปัญหากับ application/json
+          'Content-Type': 'text/plain;charset=utf-8', 
         },
         body: JSON.stringify({ config, announcements, schedule }),
       });
