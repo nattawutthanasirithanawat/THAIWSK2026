@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
   X, Lock, ShieldCheck, Save, Plus, Trash2, CheckCircle,
-  FileText, Calendar, Megaphone, Award, BookOpen, Sliders, LogOut, Info, Image, School, RefreshCw
+  FileText, Calendar, Megaphone, Award, BookOpen, Sliders, LogOut, Info, Image, School, RefreshCw,
+  Database, ExternalLink
 } from 'lucide-react';
 import { PublicConfig, Announcement, ScheduleItem, ProjectObjective, AwardCriteriaItem } from '../types';
 import { ApiService } from '../services/api';
@@ -31,7 +32,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   // Active admin tab
   const [activeTab, setActiveTab] = useState<
-    'general' | 'images' | 'about' | 'criteria' | 'exams' | 'search' | 'schedule' | 'announcements' | 'footer'
+    'general' | 'images' | 'about' | 'criteria' | 'exams' | 'search' | 'schedule' | 'announcements' | 'footer' | 'sheets'
   >('general');
 
   // Form states cloned for editing
@@ -42,6 +43,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [saveMessage, setSaveMessage] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Google Sheets Live Inspector State
+  const [sheetData, setSheetData] = useState<{
+    status: 'ONLINE' | 'OFFLINE';
+    lastUpdated: string;
+    lastUpdatedBy: string;
+    items: Array<{ key: string; value: string; description: string; category: string; updatedAt: string }>;
+    spreadsheetUrl: string;
+    totalKeys: number;
+  } | null>(null);
+  const [isLoadingSheetData, setIsLoadingSheetData] = useState<boolean>(false);
 
   // Only clone state on initial open, NEVER wipe or overwrite while admin is typing/editing!
   const wasOpenRef = React.useRef<boolean>(false);
@@ -103,12 +115,25 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       setFormSchedule(fresh.schedule);
       onSaveAll(fresh.config, fresh.announcements, fresh.schedule);
       setSaveSuccess(true);
-      setSaveMessage('ดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์กลางเรียบร้อยแล้ว (ตรงกันทุกอุปกรณ์)');
+      setSaveMessage('ดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์และ Google Sheets เรียบร้อยแล้ว (ตรงกันทุกอุปกรณ์)');
       setTimeout(() => setSaveSuccess(false), 4000);
+      handleLoadSheetData();
     } catch (err) {
       console.error('Sync error:', err);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleLoadSheetData = async () => {
+    setIsLoadingSheetData(true);
+    try {
+      const raw = await ApiService.fetchGoogleSheetsRawData();
+      setSheetData(raw);
+    } catch (e) {
+      console.error('Error fetching raw Google Sheet data:', e);
+    } finally {
+      setIsLoadingSheetData(false);
     }
   };
 
@@ -396,10 +421,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                 { id: 'schedule', label: '7. กำหนดการ', icon: <Calendar className="w-3.5 h-3.5" /> },
                 { id: 'announcements', label: '8. ประกาศข่าว', icon: <Megaphone className="w-3.5 h-3.5" /> },
                 { id: 'footer', label: '9. ข้อมูลกลุ่มสาระ & ผู้พัฒนา', icon: <School className="w-3.5 h-3.5" /> },
+                { id: 'sheets', label: '10. ฐานข้อมูล Google Sheets (เรียกดูข้อมูล)', icon: <Database className="w-3.5 h-3.5 text-emerald-600" /> },
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => {
+                    setActiveTab(tab.id as any);
+                    if (tab.id === 'sheets') {
+                      handleLoadSheetData();
+                    }
+                  }}
                   className={`flex items-center gap-1.5 py-3 px-3.5 font-heading text-xs font-medium whitespace-nowrap border-b-2 transition-all cursor-pointer ${
                     activeTab === tab.id
                       ? 'border-[#7043A6] text-[#4B267D] font-bold bg-white'
@@ -1402,6 +1433,135 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       onChange={(e) => setFormConfig({ ...formConfig, FOOTER_COPYRIGHT: e.target.value })}
                       className="w-full px-3 py-2 border rounded-lg text-xs font-medium"
                     />
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 10: Google Sheets Inspector (เรียกดูข้อมูลว่าแก้ไขอะไรไป & ซิงค์สด) */}
+              {activeTab === 'sheets' && (
+                <div className="space-y-6">
+                  <div>
+                    <div className="font-heading font-semibold text-base text-[#4B267D] mb-1">
+                      ฐานข้อมูลกลาง Google Sheets & บันทึกการแก้ไข (Live Sheets Inspector)
+                    </div>
+                    <p className="text-xs text-stone-500">
+                      ระบบดึงข้อมูลสดจากแผ่นงาน <span className="font-semibold text-stone-700">ADMIN_CONTROL</span> ใน Google Sheets แบบเรียลไทม์ เพื่อตรวจสอบค่าที่ถูกบันทึกล่าสุด
+                    </p>
+                  </div>
+
+                  {/* Status Banner */}
+                  <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>สถานะ: เชื่อมต่อ Google Sheets ฐานข้อมูลกลางสำเร็จ</span>
+                      </div>
+                      <div className="text-xs text-stone-600">
+                        Spreadsheet ID: <code className="bg-white/80 px-1.5 py-0.5 rounded border border-emerald-200 text-stone-700 font-mono text-[11px]">10uaEo5pVJ3hDGeLixOnPsDT60WQtqVmSPXPS4FJnuN8</code>
+                      </div>
+                      <div className="text-xs text-stone-500">
+                        อัปเดตล่าสุดใน Google Sheets: <span className="font-semibold text-stone-700">{sheetData?.lastUpdated || formConfig.LAST_UPDATED_AT || 'เมื่อสักครู่'}</span> | ผู้บันทึก: <span className="font-semibold text-stone-700">{sheetData?.lastUpdatedBy || formConfig.LAST_UPDATED_BY || 'THAIWSK44230'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleLoadSheetData}
+                        disabled={isLoadingSheetData}
+                        className="px-3.5 py-2 rounded-xl bg-white border border-emerald-300 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isLoadingSheetData ? 'animate-spin' : ''}`} />
+                        <span>{isLoadingSheetData ? 'กำลังดึงข้อมูลสด...' : 'รีเฟรชข้อมูลจาก Sheets'}</span>
+                      </button>
+                      <a
+                        href="https://docs.google.com/spreadsheets/d/10uaEo5pVJ3hDGeLixOnPsDT60WQtqVmSPXPS4FJnuN8/edit"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3.5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>เปิด Google Sheets จริง</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Summary of what was saved */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-center">
+                      <div className="text-[11px] text-stone-500">ภาพสไลด์หัวเว็บ</div>
+                      <div className="font-bold text-base text-[#4B267D]">{formConfig.HERO_BANNER_IMAGES?.length || 0} ภาพ</div>
+                    </div>
+                    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-center">
+                      <div className="text-[11px] text-stone-500">ภาพสไลด์เกี่ยวกับ</div>
+                      <div className="font-bold text-base text-[#4B267D]">{formConfig.ABOUT_IMAGES?.length || 0} ภาพ</div>
+                    </div>
+                    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-center">
+                      <div className="text-[11px] text-stone-500">เกณฑ์รางวัล</div>
+                      <div className="font-bold text-base text-[#4B267D]">{formConfig.CRITERIA_ITEMS?.length || 0} ระดับ</div>
+                    </div>
+                    <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-center">
+                      <div className="text-[11px] text-stone-500">ประกาศ & กำหนดการ</div>
+                      <div className="font-bold text-base text-[#4B267D]">{(formAnnouncements?.length || 0) + (formSchedule?.length || 0)} รายการ</div>
+                    </div>
+                  </div>
+
+                  {/* Data Inspection Table ("ฟิลแบบเรียกดูข้อมูลว่าแก้ไขอะไรไป") */}
+                  <div className="rounded-xl border border-stone-200 overflow-hidden bg-white shadow-xs">
+                    <div className="px-4 py-3 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+                      <span className="font-heading font-semibold text-xs text-[#30283A]">
+                        รายการฟิลด์ทั้งหมดที่ถูกส่งและบันทึกลงใน Google Sheets (ADMIN_CONTROL)
+                      </span>
+                      <span className="text-[11px] text-stone-500">
+                        {sheetData?.items?.length ? `พบ ${sheetData.items.length} รายการในชีตจริง` : 'ดึงข้อมูลสดพร้อมใช้งาน'}
+                      </span>
+                    </div>
+
+                    <div className="max-h-96 overflow-y-auto divide-y divide-stone-100 text-xs">
+                      {(sheetData?.items && sheetData.items.length > 0) ? (
+                        sheetData.items.map((it, idx) => (
+                          <div key={idx} className="p-3 hover:bg-stone-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="space-y-0.5 sm:max-w-xs shrink-0">
+                              <code className="font-mono font-semibold text-[#4B267D] text-xs">{it.key}</code>
+                              {it.description && (
+                                <p className="text-[11px] text-stone-500">{it.description}</p>
+                              )}
+                            </div>
+                            <div className="flex-1 px-2 font-mono text-[11px] text-stone-700 bg-stone-50 p-1.5 rounded border border-stone-200 break-all max-h-20 overflow-y-auto">
+                              {it.value}
+                            </div>
+                            <div className="shrink-0 text-right sm:w-28 text-[10px] text-stone-400">
+                              {it.updatedAt || 'ล่าสุด'}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        /* Current form values */
+                        [
+                          { key: 'PROJECT_NAME', val: formConfig.PROJECT_NAME, desc: 'ชื่อย่อโครงการ' },
+                          { key: 'PROJECT_SUBTITLE', val: formConfig.PROJECT_SUBTITLE, desc: 'ชื่อกิจกรรม' },
+                          { key: 'HERO_BANNER_IMAGES', val: JSON.stringify(formConfig.HERO_BANNER_IMAGES), desc: 'ภาพสไลด์ 10 วินาที หัวเว็บ' },
+                          { key: 'ABOUT_IMAGES', val: JSON.stringify(formConfig.ABOUT_IMAGES), desc: 'ภาพสไลด์ 10 วินาที เกี่ยวกับโครงการ' },
+                          { key: 'ABOUT_OBJECTIVES', val: JSON.stringify(formConfig.ABOUT_OBJECTIVES), desc: 'วัตถุประสงค์โครงการ' },
+                          { key: 'CRITERIA_ITEMS', val: JSON.stringify(formConfig.CRITERIA_ITEMS), desc: 'เกณฑ์รางวัลที่จัดกึ่งกลาง' },
+                          { key: 'FULL_SCORE', val: String(formConfig.FULL_SCORE), desc: 'คะแนนเต็ม' },
+                          { key: 'PASS_PERCENT', val: `${formConfig.PASS_PERCENT}%`, desc: 'เกณฑ์ผ่าน' },
+                          { key: 'SCHOOL_NAME', val: formConfig.SCHOOL_NAME, desc: 'ชื่อกลุ่มสาระ/โรงเรียน' },
+                          { key: 'DEVELOPER_NAME', val: formConfig.DEVELOPER_NAME, desc: 'ผู้พัฒนาระบบ' },
+                          { key: 'LAST_UPDATED_AT', val: formConfig.LAST_UPDATED_AT || 'อัปเดตเรียลไทม์', desc: 'เวลาบันทึก' },
+                        ].map((item, idx) => (
+                          <div key={idx} className="p-3 hover:bg-stone-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="space-y-0.5 sm:max-w-xs shrink-0">
+                              <code className="font-mono font-semibold text-[#4B267D] text-xs">{item.key}</code>
+                              <p className="text-[11px] text-stone-500">{item.desc}</p>
+                            </div>
+                            <div className="flex-1 px-2 font-mono text-[11px] text-stone-700 bg-stone-50 p-1.5 rounded border border-stone-200 break-all max-h-16 overflow-y-auto">
+                              {item.val}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

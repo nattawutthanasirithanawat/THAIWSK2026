@@ -85,6 +85,10 @@ export interface PublicConfig {
   
   // Footer Copyright
   FOOTER_COPYRIGHT: string;
+
+  // Real-time synchronization metadata
+  LAST_UPDATED_AT?: string;
+  LAST_UPDATED_BY?: string;
 }
 
 export interface Participant {

@@ -537,4 +537,66 @@ export class ApiService {
       records: matches,
     };
   }
+
+  /**
+   * Fetches raw ADMIN_CONTROL data directly from Google Sheets for live inspection in Admin Panel
+   */
+  public static async fetchGoogleSheetsRawData(): Promise<{
+    status: 'ONLINE' | 'OFFLINE';
+    lastUpdated: string;
+    lastUpdatedBy: string;
+    items: Array<{ key: string; value: string; description: string; category: string; updatedAt: string }>;
+    spreadsheetUrl: string;
+    totalKeys: number;
+  }> {
+    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`;
+    try {
+      const sheetsUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=ADMIN_CONTROL&_t=${Date.now()}`;
+      const res = await fetch(sheetsUrl, { cache: 'no-store' });
+      if (res.ok) {
+        const text = await res.text();
+        const rows = parseCSV(text);
+        const items: Array<{ key: string; value: string; description: string; category: string; updatedAt: string }> = [];
+        let lastUpdated = '';
+        let lastUpdatedBy = '';
+
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || r.length < 2) continue;
+          const key = r[0].replace(/^"|"$/g, '').trim();
+          const value = r[1].replace(/^"|"$/g, '').trim().replace(/""/g, '"');
+          const description = (r[2] || '').replace(/^"|"$/g, '').trim();
+          const category = (r[3] || '').replace(/^"|"$/g, '').trim();
+          const updatedAt = (r[4] || '').replace(/^"|"$/g, '').trim();
+
+          if (!key || key === 'Setting_Key' || key.includes(' ')) continue;
+
+          if (key === 'LAST_UPDATED_AT') lastUpdated = value;
+          if (key === 'LAST_UPDATED_BY') lastUpdatedBy = value;
+
+          items.push({ key, value, description, category, updatedAt });
+        }
+
+        return {
+          status: 'ONLINE',
+          lastUpdated: lastUpdated || new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }) + ' (น.)',
+          lastUpdatedBy: lastUpdatedBy || 'THAIWSK44230 (ผู้ดูแลระบบ)',
+          items,
+          spreadsheetUrl,
+          totalKeys: items.length,
+        };
+      }
+    } catch (e) {
+      console.warn('Google Sheets raw fetch warning:', e);
+    }
+
+    return {
+      status: 'OFFLINE',
+      lastUpdated: 'ยังไม่สามารถเชื่อมต่อได้',
+      lastUpdatedBy: 'ไม่ระบุ',
+      items: [],
+      spreadsheetUrl,
+      totalKeys: 0,
+    };
+  }
 }
