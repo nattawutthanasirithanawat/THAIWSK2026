@@ -24,11 +24,23 @@ export default function App() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  const lastSavedAtRef = React.useRef<number>(0);
+  const isAdminModalOpenRef = React.useRef<boolean>(isAdminModalOpen);
+
+  React.useEffect(() => {
+    isAdminModalOpenRef.current = isAdminModalOpen;
+  }, [isAdminModalOpen]);
+
   useEffect(() => {
     let isMounted = true;
 
     const applyData = (data: { config: PublicConfig; announcements: Announcement[]; schedule: ScheduleItem[] }) => {
       if (!isMounted) return;
+      // If admin is currently editing in the Admin Modal, do not overwrite their active screen!
+      if (isAdminModalOpenRef.current) return;
+      // If recently saved by admin on this machine, do not let older/background fetch overwrite it
+      if (Date.now() < lastSavedAtRef.current) return;
+
       setConfig(data.config);
       setAnnouncements(data.announcements);
       setSchedule(data.schedule);
@@ -101,6 +113,9 @@ export default function App() {
     updatedAnnouncements: Announcement[],
     updatedSchedule: ScheduleItem[]
   ) => {
+    // Lock for 15 seconds against any stale background overwrite
+    lastSavedAtRef.current = Date.now() + 15000;
+    
     setConfig(updatedConfig);
     setAnnouncements(updatedAnnouncements);
     setSchedule(updatedSchedule);

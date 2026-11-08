@@ -43,9 +43,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // Sync state whenever opened
+  // Only clone state on initial open, NEVER wipe or overwrite while admin is typing/editing!
+  const wasOpenRef = React.useRef<boolean>(false);
   React.useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !wasOpenRef.current) {
       setFormConfig(config);
       setFormAnnouncements(announcements);
       setFormSchedule(schedule);
@@ -53,7 +54,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       setSaveSuccess(false);
       setSaveMessage('');
     }
-  }, [isOpen, config, announcements, schedule]);
+    wasOpenRef.current = isOpen;
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

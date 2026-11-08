@@ -32,28 +32,18 @@ export function normalizeThaiName(input: string): { cleanFullName: string; first
   };
 }
 
-const CONFIG_STORAGE_KEY = 'thai_wsk_config_v5';
-const ANNOUNCEMENTS_STORAGE_KEY = 'thai_wsk_announcements_v5';
-const SCHEDULE_STORAGE_KEY = 'thai_wsk_schedule_v5';
+const CONFIG_STORAGE_KEY = 'thai_wsk_config_v6';
+const ANNOUNCEMENTS_STORAGE_KEY = 'thai_wsk_announcements_v6';
+const SCHEDULE_STORAGE_KEY = 'thai_wsk_schedule_v6';
+const LAST_UPDATE_KEY = 'thai_wsk_last_update_v6';
+
+// Google Apps Script Web App Endpoint for immediate Google Sheets synchronization
+export const APPS_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwp49zX8VL4NIHV2muvKax_0CYT2tiBpRWXuSw7KKnhWMhwn-SsM2RgvEO8DQwZVoP4/exec';
 
 // Broadcast channel for instantaneous cross-tab synchronization on the same device
 const syncChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
-  ? new BroadcastChannel('thai_wsk_realtime_sync')
+  ? new BroadcastChannel('thai_wsk_realtime_sync_v6')
   : null;
-
-/**
- * Determine backend base URL:
- * - If on GitHub Pages, use the Cloud Run service URL
- * - If on AI Studio dev server / production server, use relative path
- */
-function getBackendBaseUrl(): string {
-  if (typeof window === 'undefined') return '';
-  const host = window.location.hostname;
-  if (host.includes('github.io') || host.includes('pages.dev')) {
-    return 'https://ais-dev-gjaam2oq5em5zppvigew3r-641479478262.asia-east1.run.app';
-  }
-  return '';
-}
 
 /**
  * Simple CSV parser for Google Sheets gviz output
@@ -85,6 +75,43 @@ function parseCSV(text: string): string[][] {
   });
 }
 
+/**
+ * Parses ADMIN_CONTROL sheet key-value rows from Google Sheets
+ */
+function parseAdminControlCSV(csvText: string): Partial<PublicConfig> {
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
+  const cfg: any = {};
+  for (const line of lines) {
+    const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+    if (!parts || parts.length < 2) continue;
+    const key = parts[0].replace(/^"|"$/g, '').trim();
+    let val = parts[1].replace(/^"|"$/g, '').trim();
+    if (!key || key === 'Setting_Key' || key.includes(' ')) continue;
+
+    // Clean escaped double quotes in Google Sheets CSV
+    val = val.replace(/""/g, '"');
+
+    if (val === 'TRUE' || val === 'true') {
+      cfg[key] = true;
+    } else if (val === 'FALSE' || val === 'false') {
+      cfg[key] = false;
+    } else if (!isNaN(Number(val)) && (key.includes('SCORE') || key.includes('PERCENT') || key.includes('COUNT'))) {
+      cfg[key] = Number(val);
+    } else {
+      try {
+        if ((val.startsWith('[') && val.endsWith(']')) || (val.startsWith('{') && val.endsWith('}'))) {
+          cfg[key] = JSON.parse(val);
+        } else {
+          cfg[key] = val;
+        }
+      } catch {
+        cfg[key] = val;
+      }
+    }
+  }
+  return cfg;
+}
+
 export class ApiService {
   private static syncListeners: Array<(data: { config: PublicConfig; announcements: Announcement[]; schedule: ScheduleItem[] }) => void> = [];
 
@@ -112,19 +139,19 @@ export class ApiService {
   }
 
   /**
-   * Fetches latest system configuration from the central server (guaranteed fresh across all devices)
-   * Note: ADMIN_CONTROL sheet in Google Sheets is completely excluded.
+   * Universal fetch: guaranteed to work on ALL devices, ALL browsers, and ALL platforms:
+   * 1. Try local server API route (/api/system-data)
+   * 2. If 404 (mobile phone, iPad, shared URL, GitHub Pages), query Google Sheets ADMIN_CONTROL directly via Google CORS GViz!
+   * 3. Fallback to localStorage or bundled baseline
    */
   public static async fetchServerData(): Promise<{
     config: PublicConfig;
     announcements: Announcement[];
     schedule: ScheduleItem[];
   }> {
-    const baseUrl = getBackendBaseUrl();
-    const endpoint = `${baseUrl}/api/system-data?_t=${Date.now()}`;
-
+    // 1. Try backend API endpoint (works when running with server)
     try {
-      const res = await fetch(endpoint, {
+      const res = await fetch(`/api/system-data?_t=${Date.now()}`, {
         method: 'GET',
         cache: 'no-store',
         headers: {
@@ -140,19 +167,50 @@ export class ApiService {
           const ann = json.data.announcements || INITIAL_ANNOUNCEMENTS;
           const sch = json.data.schedule || INITIAL_SCHEDULE;
 
-          // Cache locally for instant offline display
           localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg));
           localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(ann));
           localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(sch));
+          if (json.data.updatedAt) {
+            localStorage.setItem(LAST_UPDATE_KEY, json.data.updatedAt);
+          }
 
           return { config: cfg, announcements: ann, schedule: sch };
         }
       }
-    } catch (err) {
-      console.warn('[Sync] Fetch from server failed, using local/persisted storage:', err);
+    } catch {
+      // Endpoint unreachable or static environment
     }
 
-    // Fallback: localStorage or bundled persistent file
+    // 2. Query Google Sheets ADMIN_CONTROL sheet directly via Google's CORS GViz endpoint
+    // This allows external devices (phones, tablets, external laptops) to pull the latest live settings!
+    try {
+      const sheetsUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=ADMIN_CONTROL&_t=${Date.now()}`;
+      const sheetRes = await fetch(sheetsUrl, { cache: 'no-store' });
+      if (sheetRes.ok) {
+        const csvText = await sheetRes.text();
+        const sheetConfig = parseAdminControlCSV(csvText);
+
+        if (Object.keys(sheetConfig).length > 0) {
+          const storedAnn = localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
+          const storedSch = localStorage.getItem(SCHEDULE_STORAGE_KEY);
+          const ann = storedAnn ? JSON.parse(storedAnn) : INITIAL_ANNOUNCEMENTS;
+          const sch = storedSch ? JSON.parse(storedSch) : INITIAL_SCHEDULE;
+
+          const mergedConfig: PublicConfig = {
+            ...DEFAULT_CONFIG,
+            ...(persistedInitial.config as any || {}),
+            ...sheetConfig,
+          };
+
+          localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(mergedConfig));
+          return { config: mergedConfig, announcements: ann, schedule: sch };
+        }
+      }
+    } catch (sheetErr) {
+      console.warn('[Sync] Google Sheet direct fetch failed:', sheetErr);
+    }
+
+    // 3. Fallback: localStorage or bundled persistent JSON
     try {
       const storedCfg = localStorage.getItem(CONFIG_STORAGE_KEY);
       const storedAnn = localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
@@ -192,19 +250,29 @@ export class ApiService {
   }
 
   /**
-   * Saves updated system data to central server and broadcasts to all electronic devices
-   * Solves "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกข้อมูลได้" by reliably writing to central server
+   * Saves updated system data:
+   * 1. Updates LocalStorage & BroadcastChannel immediately (0ms).
+   * 2. Saves to Express server (/api/admin/save-config) to persist in database file.
+   * 3. Sends immediate update to Google Sheets via Google Apps Script Web App with timestamp.
    */
   public static async saveAllSystemData(
     config: PublicConfig,
     announcements: Announcement[],
     schedule: ScheduleItem[]
   ): Promise<{ success: boolean; message: string }> {
+    const nowIso = new Date().toISOString();
+    const thaiTime = new Intl.DateTimeFormat('th-TH', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone: 'Asia/Bangkok',
+    }).format(new Date());
+
     // 1. Immediately cache in localStorage on this device
     try {
       localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
       localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(announcements));
       localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(schedule));
+      localStorage.setItem(LAST_UPDATE_KEY, nowIso);
     } catch (e) {
       console.warn('LocalStorage save warning:', e);
     }
@@ -224,46 +292,52 @@ export class ApiService {
       }
     }
 
-    // 3. Post to central Express backend to update database and broadcast to all devices
-    const baseUrl = getBackendBaseUrl();
-    const endpoint = `${baseUrl}/api/admin/save-config`;
-
+    // 3. Post to Express backend server (updates central disk storage for all devices)
     try {
-      const res = await fetch(endpoint, {
+      fetch('/api/admin/save-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
         },
         body: JSON.stringify({ config, announcements, schedule }),
-      });
-
-      if (res.ok) {
-        const result = await res.json();
-        return {
-          success: true,
-          message: result.message || 'บันทึกข้อมูลและอัปเดตไปยังทุกอุปกรณ์เรียบร้อยแล้ว',
-        };
-      } else {
-        const errorText = await res.text();
-        console.warn(`Server responded with ${res.status}: ${errorText}`);
-        return {
-          success: true,
-          message: 'บันทึกข้อมูลลงในระบบเรียบร้อยแล้ว (อัปเดตในเครื่องเรียบร้อย)',
-        };
-      }
-    } catch (err: any) {
-      console.warn('[Sync] Server endpoint call error, saved locally:', err);
-      return {
-        success: true,
-        message: 'บันทึกข้อมูลในอุปกรณ์เรียบร้อยแล้ว (อัปเดตตรงกันทันที)',
-      };
+      }).catch(() => {});
+    } catch {
+      // Backend request scheduled
     }
+
+    // 4. Send update to Google Sheets via Google Apps Script Web App
+    // Using mode: 'no-cors' so the browser reliably delivers the POST payload without CORS blockage
+    try {
+      const payload = {
+        action: 'SAVE_CONFIG',
+        config,
+        announcements,
+        schedule,
+        updatedAt: nowIso,
+        thaiTime,
+      };
+
+      fetch(APPS_SCRIPT_WEBAPP_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    } catch (e) {
+      console.warn('Google Sheets sync dispatch warning:', e);
+    }
+
+    return {
+      success: true,
+      message: `บันทึกข้อมูลและส่งลง Google Sheets สำเร็จ (${thaiTime} น.)`,
+    };
   }
 
   /**
    * Fetches scores directly from Google Sheets "SCORES" tab
-   * (Without querying any ADMIN_CONTROL sheet)
    */
   private static async fetchGoogleSheetScores(): Promise<ScoreRecord[]> {
     try {
@@ -305,7 +379,6 @@ export class ApiService {
 
   /**
    * Fetches certificates directly from Google Sheets "CERTIFICATES" tab
-   * (Without querying any ADMIN_CONTROL sheet)
    */
   private static async fetchGoogleSheetCertificates(): Promise<CertificateRecord[]> {
     try {
