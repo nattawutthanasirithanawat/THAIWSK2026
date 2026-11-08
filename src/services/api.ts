@@ -46,17 +46,64 @@ const CONFIG_STORAGE_KEY = 'thai_wsk_config_v3';
 const ANNOUNCEMENTS_STORAGE_KEY = 'thai_wsk_announcements_v3';
 const SCHEDULE_STORAGE_KEY = 'thai_wsk_schedule_v3';
 
+// Broadcast channel for instantaneous cross-tab synchronization
+const syncChannel = typeof window !== 'undefined' && 'BroadcastChannel' in window
+  ? new BroadcastChannel('thai_wsk_realtime_sync')
+  : null;
+
+// Determine backend base URL (works on Local, Cloud Run, and GitHub Pages)
+function getApiBaseUrl(): string {
+  if (typeof window === 'undefined') return '';
+  const host = window.location.hostname;
+  // If hosted on GitHub Pages or custom static domain, connect to the Cloud Run backend
+  if (host.includes('github.io') || host.includes('pages.dev')) {
+    return 'https://ais-dev-gjaam2oq5em5zppvigew3r-641479478262.asia-east1.run.app';
+  }
+  return '';
+}
+
 export class ApiService {
+  private static syncListeners: Array<(data: { config: PublicConfig; announcements: Announcement[]; schedule: ScheduleItem[] }) => void> = [];
+
   /**
-   * Fetches latest system data from server (synced across all electronic devices)
+   * Register a callback for real-time broadcast updates
+   */
+  public static onSync(callback: (data: { config: PublicConfig; announcements: Announcement[]; schedule: ScheduleItem[] }) => void) {
+    this.syncListeners.push(callback);
+    if (syncChannel) {
+      syncChannel.onmessage = (event) => {
+        if (event.data?.type === 'DATA_UPDATED') {
+          callback({
+            config: event.data.config,
+            announcements: event.data.announcements,
+            schedule: event.data.schedule,
+          });
+        }
+      };
+    }
+  }
+
+  /**
+   * Fetches latest system data from server (guaranteed fresh across all electronic devices)
    */
   public static async fetchServerData(): Promise<{
     config: PublicConfig;
     announcements: Announcement[];
     schedule: ScheduleItem[];
   }> {
+    const baseUrl = getApiBaseUrl();
+    const endpoint = `${baseUrl}/api/system-data?_t=${Date.now()}`;
+
     try {
-      const res = await fetch('/api/system-data');
+      const res = await fetch(endpoint, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
+
       if (res.ok) {
         const json = await res.json();
         if (json.status === 'success' && json.data) {
@@ -64,7 +111,7 @@ export class ApiService {
           const ann = json.data.announcements || INITIAL_ANNOUNCEMENTS;
           const sch = json.data.schedule || INITIAL_SCHEDULE;
 
-          // Cache locally
+          // Cache locally for instant offline display
           localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(cfg));
           localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(ann));
           localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(sch));
@@ -72,8 +119,8 @@ export class ApiService {
           return { config: cfg, announcements: ann, schedule: sch };
         }
       }
-    } catch {
-      // Offline / Static fallback
+    } catch (err) {
+      console.warn('[Sync] Direct fetch failed, trying local fallback:', err);
     }
 
     // Fallback to persisted JSON bundled in build or localStorage
@@ -116,33 +163,68 @@ export class ApiService {
   }
 
   /**
-   * Saves updated system data to both the Server filesystem and LocalStorage
-   * Ensuring all devices access the identical latest data immediately
+   * Saves updated system data to Server filesystem, LocalStorage, and BroadcastChannel
+   * Ensuring all electronic devices access identical latest data immediately
    */
   public static async saveAllSystemData(
     config: PublicConfig,
     announcements: Announcement[],
     schedule: ScheduleItem[]
-  ): Promise<boolean> {
-    // 1. Update localStorage immediately
+  ): Promise<{ success: boolean; message: string }> {
+    // 1. Update localStorage immediately on this device
     localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
     localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(announcements));
     localStorage.setItem(SCHEDULE_STORAGE_KEY, JSON.stringify(schedule));
 
-    // 2. Post to server-side endpoint to write to persistedData.json
+    // 2. Broadcast immediately across open tabs on this machine
+    if (syncChannel) {
+      try {
+        syncChannel.postMessage({
+          type: 'DATA_UPDATED',
+          timestamp: Date.now(),
+          config,
+          announcements,
+          schedule,
+        });
+      } catch (e) {
+        console.warn('Broadcast error:', e);
+      }
+    }
+
+    // 3. Post to backend server endpoint to update central storage for all other devices
+    const baseUrl = getApiBaseUrl();
+    const endpoint = `${baseUrl}/api/admin/save-config`;
+
     try {
-      const res = await fetch('/api/admin/save-config', {
+      const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
         body: JSON.stringify({ config, announcements, schedule }),
       });
+
       if (res.ok) {
-        return true;
+        const result = await res.json();
+        return {
+          success: true,
+          message: 'บันทึกข้อมูลสำเร็จและอัปเดตไปยังทุกอุปกรณ์เรียบร้อยแล้ว',
+        };
+      } else {
+        const errorText = await res.text();
+        return {
+          success: false,
+          message: `บันทึกบนเครื่องสำเร็จ แต่เซิร์ฟเวอร์ตอบกลับรหัส ${res.status}: ${errorText}`,
+        };
       }
-    } catch (err) {
-      console.warn('Could not reach backend save endpoint, saved locally:', err);
+    } catch (err: any) {
+      console.warn('[Sync] Could not reach backend save endpoint, saved locally:', err);
+      return {
+        success: true,
+        message: 'บันทึกในอุปกรณ์ปัจจุบันสำเร็จ (กำลังรอการเชื่อมต่อเซิร์ฟเวอร์กลางเพื่อซิงค์ไปยังอุปกรณ์อื่น)',
+      };
     }
-    return true;
   }
 
   /**

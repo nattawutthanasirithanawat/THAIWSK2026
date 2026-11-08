@@ -25,62 +25,74 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
+    let isMounted = true;
+
+    const applyData = (data: { config: PublicConfig; announcements: Announcement[]; schedule: ScheduleItem[] }) => {
+      if (!isMounted) return;
+      setConfig(data.config);
+      setAnnouncements(data.announcements);
+      setSchedule(data.schedule);
+
+      if (data.config.REGISTRATION_DEADLINE) {
+        const deadline = new Date(data.config.REGISTRATION_DEADLINE).getTime();
+        const now = new Date().getTime();
+        setIsExpired(now > deadline || !data.config.REGISTRATION_OPEN);
+      }
+    };
+
     async function loadData() {
       setIsLoading(true);
       try {
-        const loadedConfig = await ApiService.getConfig();
-        const loadedAnnouncements = await ApiService.getAnnouncements();
-        const loadedSchedule = await ApiService.getSchedule();
-
-        setConfig(loadedConfig);
-        setAnnouncements(loadedAnnouncements);
-        setSchedule(loadedSchedule);
-
-        if (loadedConfig.REGISTRATION_DEADLINE) {
-          const deadline = new Date(loadedConfig.REGISTRATION_DEADLINE).getTime();
-          const now = new Date().getTime();
-          if (now > deadline || !loadedConfig.REGISTRATION_OPEN) {
-            setIsExpired(true);
-          } else {
-            setIsExpired(false);
-          }
-        }
+        const data = await ApiService.fetchServerData();
+        applyData(data);
       } catch (err) {
         console.error('Error initializing THAI WSK 2026 data:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     }
 
     loadData();
 
-    // Real-time synchronization across devices (polling every 8 seconds)
-    const syncInterval = setInterval(() => {
-      ApiService.fetchServerData().then((data) => {
-        setConfig(data.config);
-        setAnnouncements(data.announcements);
-        setSchedule(data.schedule);
-        if (data.config.REGISTRATION_DEADLINE) {
-          const deadline = new Date(data.config.REGISTRATION_DEADLINE).getTime();
-          const now = new Date().getTime();
-          setIsExpired(now > deadline || !data.config.REGISTRATION_OPEN);
-        }
-      }).catch(() => {});
-    }, 8000);
+    // 1. Instant sync from BroadcastChannel (cross-tab on same device)
+    ApiService.onSync((data) => {
+      applyData(data);
+    });
 
-    // Sync immediately when browser window regains focus
-    const handleFocus = () => {
-      ApiService.fetchServerData().then((data) => {
-        setConfig(data.config);
-        setAnnouncements(data.announcements);
-        setSchedule(data.schedule);
-      }).catch(() => {});
+    // 2. High-frequency real-time polling across separate electronic devices (every 3.5s)
+    const syncInterval = setInterval(() => {
+      ApiService.fetchServerData()
+        .then(applyData)
+        .catch(() => {});
+    }, 3500);
+
+    // 3. Immediate sync on window focus and tab visibility change (e.g. user opens phone or switches apps)
+    const handleRecheck = () => {
+      ApiService.fetchServerData()
+        .then(applyData)
+        .catch(() => {});
     };
-    window.addEventListener('focus', handleFocus);
+
+    window.addEventListener('focus', handleRecheck);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        handleRecheck();
+      }
+    });
+
+    // 4. LocalStorage cross-tab event listener
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key?.startsWith('thai_wsk_')) {
+        handleRecheck();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
 
     return () => {
+      isMounted = false;
       clearInterval(syncInterval);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', handleRecheck);
+      window.removeEventListener('storage', handleStorage);
     };
   }, []);
 

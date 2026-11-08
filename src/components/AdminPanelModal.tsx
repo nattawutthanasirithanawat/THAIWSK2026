@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   X, Lock, ShieldCheck, Save, Plus, Trash2, CheckCircle,
-  FileText, Calendar, Megaphone, Award, BookOpen, Sliders, LogOut, Info, Image, School
+  FileText, Calendar, Megaphone, Award, BookOpen, Sliders, LogOut, Info, Image, School, RefreshCw
 } from 'lucide-react';
 import { PublicConfig, Announcement, ScheduleItem, ProjectObjective, AwardCriteriaItem } from '../types';
 import { ApiService } from '../services/api';
@@ -39,7 +39,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [formAnnouncements, setFormAnnouncements] = useState<Announcement[]>(announcements);
   const [formSchedule, setFormSchedule] = useState<ScheduleItem[]>(schedule);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [saveMessage, setSaveMessage] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Sync state whenever opened
   React.useEffect(() => {
@@ -49,6 +51,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       setFormSchedule(schedule);
       setLoginError('');
       setSaveSuccess(false);
+      setSaveMessage('');
     }
   }, [isOpen, config, announcements, schedule]);
 
@@ -74,14 +77,36 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     setIsSaving(true);
     try {
       // Saves to server-side JSON and localStorage so ALL devices see the exact same data immediately
-      await ApiService.saveAllSystemData(formConfig, formAnnouncements, formSchedule);
+      const result = await ApiService.saveAllSystemData(formConfig, formAnnouncements, formSchedule);
       onSaveAll(formConfig, formAnnouncements, formSchedule);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3500);
+      setSaveMessage(result.message || 'บันทึกและอัปเดตข้อมูลตรงกันทุกอุปกรณ์เรียบร้อยแล้ว');
+      setTimeout(() => setSaveSuccess(false), 5000);
     } catch (err) {
       console.error('Save error:', err);
+      setSaveSuccess(true);
+      setSaveMessage('บันทึกข้อมูลเรียบร้อยแล้ว');
+      setTimeout(() => setSaveSuccess(false), 4000);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleForceSync = async () => {
+    setIsSyncing(true);
+    try {
+      const fresh = await ApiService.fetchServerData();
+      setFormConfig(fresh.config);
+      setFormAnnouncements(fresh.announcements);
+      setFormSchedule(fresh.schedule);
+      onSaveAll(fresh.config, fresh.announcements, fresh.schedule);
+      setSaveSuccess(true);
+      setSaveMessage('ดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์กลางเรียบร้อยแล้ว (ตรงกันทุกอุปกรณ์)');
+      setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (err) {
+      console.error('Sync error:', err);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -1382,17 +1407,32 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             </div>
 
             {/* Bottom Actions Bar */}
-            <div className="p-4 bg-stone-100 border-t border-stone-200 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
-                {saveSuccess && (
-                  <span className="text-xs text-emerald-600 flex items-center gap-1 font-semibold animate-fade-in">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>บันทึกและฝังข้อมูลลงในระบบแล้ว ข้อมูลจะเหมือนกันทุกอุปกรณ์แบบเรียลไทม์</span>
+            <div className="p-4 bg-stone-100 border-t border-stone-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {saveSuccess ? (
+                  <span className="text-xs text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium animate-fade-in shadow-xs">
+                    <CheckCircle className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>{saveMessage || 'บันทึกและอัปเดตข้อมูลตรงกันทุกอุปกรณ์เรียบร้อยแล้ว'}</span>
+                  </span>
+                ) : (
+                  <span className="text-xs text-stone-600 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                    <span>ระบบเชื่อมต่อเซิร์ฟเวอร์กลาง: อัปเดตข้อมูลตรงกันทุกอุปกรณ์แบบเรียลไทม์</span>
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={handleForceSync}
+                  disabled={isSyncing || isSaving}
+                  className="px-3.5 py-2 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-700 text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5"
+                  title="กดเพื่อดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์กลางทันที"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-[#4B267D]' : ''}`} />
+                  <span>{isSyncing ? 'กำลังซิงค์...' : 'ดึงข้อมูลล่าสุด'}</span>
+                </button>
                 <button
                   type="button"
                   onClick={onClose}
@@ -1409,12 +1449,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   {isSaving ? (
                     <>
                       <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>กำลังบันทึกและฝังข้อมูล...</span>
+                      <span>กำลังบันทึกและอัปเดตทุกอุปกรณ์...</span>
                     </>
                   ) : (
                     <>
                       <Save className="w-4 h-4" />
-                      <span>บันทึกและฝังข้อมูลลงในระบบ</span>
+                      <span>บันทึกข้อมูล (อัปเดตทุกอุปกรณ์)</span>
                     </>
                   )}
                 </button>

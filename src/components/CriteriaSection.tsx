@@ -72,34 +72,42 @@ export const CriteriaSection: React.FC<CriteriaSectionProps> = ({ config }) => {
           </p>
         </div>
 
-        {/* Award Levels Grid (Dynamically rendered and editable by admin) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {criteriaItems.map((item) => {
-            const style = getCardStyle(item.colorTheme);
-            return (
-              <div
-                key={item.id}
-                className={`rounded-2xl border ${style.border} ${style.bg} p-6 text-center shadow-xs hover:shadow-md transition-all`}
-              >
-                <div className={`w-14 h-14 mx-auto rounded-full border flex items-center justify-center mb-4 shadow-inner ${style.iconWrap}`}>
-                  {style.icon}
+        {/* Award Levels Centered Layout (Dynamically rendered, automatically centers remaining items when any item is deleted) */}
+        {criteriaItems.length === 0 ? (
+          <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-stone-200 bg-stone-50/50 max-w-md mx-auto">
+            <p className="text-stone-500 text-sm">ยังไม่มีข้อมูลเกณฑ์การประเมิน (แอดมินสามารถเพิ่มเกณฑ์ได้ในระบบจัดการ)</p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap justify-center items-stretch gap-6 max-w-5xl mx-auto">
+            {criteriaItems.map((item) => {
+              const style = getCardStyle(item.colorTheme);
+              return (
+                <div
+                  key={item.id}
+                  className={`w-full sm:w-[260px] md:w-[270px] rounded-2xl border ${style.border} ${style.bg} p-6 text-center shadow-xs hover:shadow-md transition-all flex flex-col justify-between`}
+                >
+                  <div>
+                    <div className={`w-14 h-14 mx-auto rounded-full border flex items-center justify-center mb-4 shadow-inner ${style.iconWrap}`}>
+                      {style.icon}
+                    </div>
+                    <h3 className={`font-heading font-bold text-lg mb-1 ${style.title}`}>
+                      {item.name}
+                    </h3>
+                    <div className={`text-2xl font-bold font-heading mb-1 ${style.score}`}>
+                      {item.minScore} – {item.maxScore} คะแนน
+                    </div>
+                    <div className={`text-xs font-medium mb-3 ${style.sub}`}>
+                      {item.percentLabel}
+                    </div>
+                    <p className="text-xs text-stone-600 leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
                 </div>
-                <h3 className={`font-heading font-bold text-lg mb-1 ${style.title}`}>
-                  {item.name}
-                </h3>
-                <div className={`text-2xl font-bold font-heading mb-1 ${style.score}`}>
-                  {item.minScore} – {item.maxScore} คะแนน
-                </div>
-                <div className={`text-xs font-medium mb-3 ${style.sub}`}>
-                  {item.percentLabel}
-                </div>
-                <p className="text-xs text-stone-600 leading-relaxed">
-                  {item.description}
-                </p>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
       </div>
     </section>

@@ -171,6 +171,21 @@ function searchCertificate() {
   }
 }
 
+async function syncFromCloud() {
+  try {
+    const res = await fetch('https://ais-dev-gjaam2oq5em5zppvigew3r-641479478262.asia-east1.run.app/api/system-data?_t=' + Date.now(), { cache: 'no-store' });
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data && json.data.config) {
+        Object.assign(CONFIG, json.data.config);
+      }
+    }
+  } catch (e) {
+    // offline static fallback
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initCountdown();
+  syncFromCloud();
 });

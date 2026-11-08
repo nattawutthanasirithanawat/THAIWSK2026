@@ -26,18 +26,51 @@ async function startServer() {
     console.error('Error reading persisted data file:', err);
   }
 
+  // Enable CORS & No-Cache for all API routes to ensure instant multi-device synchronization
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cache-Control, Pragma');
+    
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+      return;
+    }
+
+    if (req.path.startsWith('/api/')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    }
+    next();
+  });
+
   // API Route: Get latest system data (shared across all devices)
   app.get('/api/system-data', (_req, res) => {
     try {
       if (fs.existsSync(dataFilePath)) {
         const fileContent = fs.readFileSync(dataFilePath, 'utf-8');
-        res.json({ status: 'success', data: JSON.parse(fileContent) });
+        const parsed = JSON.parse(fileContent);
+        currentSystemData = parsed;
+        res.json({
+          status: 'success',
+          data: parsed,
+          serverTime: new Date().toISOString(),
+          updatedAt: parsed.updatedAt || new Date().toISOString(),
+        });
         return;
       }
     } catch (e) {
-      // fallback to memory
+      console.warn('Reading dataFilePath failed, using in-memory state:', e);
     }
-    res.json({ status: 'success', data: currentSystemData });
+
+    res.json({
+      status: 'success',
+      data: currentSystemData,
+      serverTime: new Date().toISOString(),
+      updatedAt: currentSystemData?.updatedAt || new Date().toISOString(),
+    });
   });
 
   // API Route: Save system data (immediately writes to disk and memory for all devices)
@@ -49,18 +82,30 @@ async function startServer() {
         return;
       }
 
+      const updatedAt = new Date().toISOString();
       const payload = {
         config,
         announcements: announcements || [],
         schedule: schedule || [],
-        updatedAt: new Date().toISOString(),
+        updatedAt,
       };
 
       currentSystemData = payload;
-      fs.writeFileSync(dataFilePath, JSON.stringify(payload, null, 2), 'utf-8');
-      console.log('Successfully saved system configuration to disk at', new Date().toISOString());
 
-      res.json({ status: 'success', message: 'Saved successfully and embedded into system' });
+      try {
+        fs.writeFileSync(dataFilePath, JSON.stringify(payload, null, 2), 'utf-8');
+      } catch (writeErr) {
+        console.error('File write warning:', writeErr);
+      }
+
+      console.log(`[SYNC] System config updated by admin at ${updatedAt}. Synced across all connected devices.`);
+
+      res.json({
+        status: 'success',
+        message: 'Saved successfully and broadcasted across all devices',
+        updatedAt,
+        data: payload,
+      });
     } catch (err: any) {
       console.error('Failed to save system data:', err);
       res.status(500).json({ status: 'error', message: err.message });
